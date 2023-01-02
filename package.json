@@ -1,0 +1,48 @@
+{
+  "name": "kube",
+  "version": "1.0.0",
+  "description": "My Moleculer-based microservices project",
+  "scripts": {
+    "dev": "moleculer-runner --repl --hot services/**/*.service.js",
+    "start": "moleculer-runner",
+    "cli": "moleculer connect NATS",
+    "ci": "jest --watch",
+    "test": "jest --coverage",
+    "lint": "eslint services",
+    "dc:up": "docker-compose up --build -d",
+    "dc:logs": "docker-compose logs -f",
+    "dc:down": "docker-compose down"
+  },
+  "keywords": [
+    "microservices",
+    "moleculer"
+  ],
+  "author": "",
+  "devDependencies": {
+    "eslint": "^8.25.0",
+    "jest": "^27.5.1",
+    "jest-cli": "^27.5.1",
+    "moleculer-repl": "^0.7.3"
+  },
+  "dependencies": {
+    "config-mixin": "git+https://github.com/FLYBYME/config-mixin.git",
+    "cron-mixin": "git+https://github.com/PaaS-Shack/cron-mixin.git",
+    "db-mixin": "git+https://github.com/PaaS-Shack/db-mixin.git",
+    "generate-password": "^1.7.0",
+    "membership-mixin": "git+https://github.com/FLYBYME/membership-mixin.git",
+    "middlewares": "git+https://github.com/PaaS-Shack/middlewares.git",
+    "moleculer": "^0.14.26",
+    "nats": "^2.7.1"
+  },
+  "engines": {
+    "node": ">= 16.x.x"
+  },
+  "jest": {
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node",
+    "rootDir": "./services",
+    "roots": [
+      "../test"
+    ]
+  }
+}
