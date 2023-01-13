@@ -90,8 +90,8 @@ module.exports = {
 			rest: "GET /find",
 			permissions: ['domains.records.find'],
 			params: {
-				deployment: { type: "string", min: 3, optional: false },
-				namespace: { type: "string", min: 3, optional: false }
+				//deployment: { type: "string", min: 3, optional: false },
+				//namespace: { type: "string", min: 3, optional: false }
 			}
 		},
 		count: {
@@ -159,13 +159,17 @@ module.exports = {
 
 					const callCMD = `v1.${params.key}.provision`
 
-
-					this.logger.info(`Provisioning ENV ${params.key} for ${params.reference} at ${callCMD}`)
-
 					if (!params.called) {
+						this.logger.info(`Provisioning ENV ${params.key} for ${params.reference} at ${callCMD}`)
+
+						const namespace = await ctx.call('v1.namespaces.resolve', { id: params.namespace, fields: ['name', 'cluster'] })
+						const deployment = await ctx.call('v1.namespaces.deployments.resolve', { id: params.deployment, fields: ['name', 'zone'] })
+
 
 						const entity = await ctx.call(callCMD, {
-							id: params.value
+							id: params.value,
+							prefix: namespace.name,
+							zone: deployment.zone
 						})
 
 						params.value = entity.id
@@ -347,6 +351,7 @@ module.exports = {
 			}
 			await ctx.call('v1.kube.createNamespacedConfigMap', {
 				namespace: namespace.name,
+				cluster: namespace.cluster,
 				name: deployment.name,
 				body: configMap
 			})
@@ -354,10 +359,25 @@ module.exports = {
 		async "namespaces.deployments.removed"(ctx) {
 			const deployment = ctx.params.data;
 			const namespace = await ctx.call('v1.namespaces.resolve', { id: deployment.namespace })
-			await ctx.call('v1.kube.deleteNamespacedConfigMap', {
-				namespace: namespace.name,
-				name: deployment.name
+
+			const entities = await this.findEntities(ctx, {
+				query: {
+					namespace: namespace.id,
+					deployment: deployment.id
+				}
 			})
+			await Promise.allSettled(entities.map((entity) =>
+				this.removeEntity(ctx, { scope: false, id: entity.id })))
+				.then(() =>
+					this.logger.info(`ROUTE namespace remove event for ${namespace.name}`))
+		},
+		async "namespaces.removed"(ctx) {
+			const namespace = ctx.params.data;
+			const entities = await this.findEntities(ctx, { scope: false, query: { namespace: namespace.id } })
+			return Promise.allSettled(entities.map((entity) =>
+				this.removeEntity(ctx, { scope: false, id: entity.id })))
+				.then(() =>
+					this.logger.info(`ROUTE namespace remove event for ${namespace.name}`))
 		},
 	},
 
@@ -366,15 +386,14 @@ module.exports = {
 	 */
 	methods: {
 		async patchConfigMap(ctx, env, create = false) {
-			console.log(env)
-			const namespace = await ctx.call('v1.namespaces.resolve', { scope: false, id: env.namespace, fields: ['name'] }).then((namespace) => namespace.name)
-			const name = await ctx.call('v1.namespaces.deployments.resolve', { scope: false, id: env.deployment, fields: ['name'] }).then((deployment) => deployment.name)
+			const namespace = await ctx.call('v1.namespaces.resolve', { scope: false, id: env.namespace, fields: ['name', 'cluster'] })
+			const deployment = await ctx.call('v1.namespaces.deployments.resolve', { scope: false, id: env.deployment, fields: ['name'] })
 
 			const configMap = {
 				"apiVersion": "v1",
 				"kind": "ConfigMap",
 				"metadata": {
-					"name": `${name}`
+					"name": `${deployment.name}`
 				},
 				"data": await ctx.call('v1.envs.pack', {
 					namespace: env.namespace,
@@ -385,12 +404,14 @@ module.exports = {
 
 
 			await ctx.call('v1.kube.replaceNamespacedConfigMap', {
-				namespace,
-				name,
+				namespace: namespace.name,
+				cluster: namespace.cluster,
+				name: deployment.name,
 				body: configMap
-			}).catch(()=>{
+			}).catch(() => {
 				return ctx.call('v1.kube.createNamespacedConfigMap', {
 					namespace: namespace.name,
+					cluster: namespace.cluster,
 					name: deployment.name,
 					body: configMap
 				})

@@ -294,18 +294,21 @@ module.exports = {
 				const ev = await ctx.call('v1.events.update', {
 					id: found.id,
 					...data,
-					scope:false
+					scope: false
 				}, options).catch(() => null)
-				if(ev){
-					this.logger.info(`Event updated ${ev.id} ${ev.type} ${ev.reason} ${ev.involvedObject.kind}`)
-				}else{
-					this.logger.info(`Event updated failed ${found.id} ${found.type} ${data.reason} ${data.involvedObject.kind}`)
+				if (ev) {
+					this.logger.debug(`Event updated ${ev.id} ${ev.type} ${ev.reason} ${ev.involvedObject.kind} ${ev.involvedObject.namespace}`)
+					this.logger.debug(`=> ${ev.message}`)
+				} else {
+					this.logger.debug(`Event updated failed ${found.id} ${found.type} ${data.reason} ${data.involvedObject.kind} ${data.involvedObject.namespace}`)
 				}
 			} else {
 				const ev = await ctx.call('v1.events.create', {
 					...data,
 				}, options)
-				this.logger.info(`Event created ${ev.id} ${ev.type} ${ev.reason} ${ev.involvedObject.kind}`)
+				this.logger.debug(`Event created ${ev.id} ${ev.type} ${ev.reason} ${ev.involvedObject.kind} ${ev.involvedObject.namespace}`)
+				this.logger.debug(`=> ${ev.message}`)
+
 			}
 			await this.lock.release(event.metadata.uid)
 

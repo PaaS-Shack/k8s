@@ -170,24 +170,30 @@ module.exports = {
 		},
 		async seedDB() {
 			const sizes = [];
-			let memBase = 256;
-			let cpuBase = 500;
+			let memBase = 25;
+			let cpuBase = 50;
 
-			for (let i = 1; i < 5; i++) {
+			for (let i = 1; i < 15; i++) {
 
 				let cpuCount = cpuBase * i;
 				let memoryCount = memBase * i;
+				let name = `S${i}`
+				let group = 'C'
+				if (i > 9) {
+					name = `L${i - 9}`
+					group = 'A'
+				}
 				sizes.push({
-					name: `S${i}`,
-					group: 'C',
-					"requests.cpu": (500 + (cpuBase * i)) * 1,
-					"requests.memory": (1024 + (memBase * i)) * 1,
-					"limits.cpu": (500 + (cpuBase * i)) * 2,
-					"limits.memory": (1024 + (memBase * i)) * 2,
-					pods: 4 * i,
-					secrets: 5 * i,
+					name,
+					group,
+					"requests.cpu": Number((cpuBase * (Math.pow(i, 0.7)) * i).toFixed()),
+					"requests.memory": Number((memBase * (Math.pow(i, 0.7)) * i).toFixed()),
+					"limits.cpu": Number((cpuBase * (Math.pow(i, 0.9)) * i).toFixed()),
+					"limits.memory": Number((memBase * (Math.pow(i, 0.9)) * i).toFixed()),
+					pods: 2 * i,
+					secrets: 2 * i,
 					persistentvolumeclaims: 5 * i,
-					"requests.storage": 1024 * 10,
+					"requests.storage": 1024 * 10 * i,
 					"services.loadbalancers": 0,
 					"services.nodeports": 0
 				})

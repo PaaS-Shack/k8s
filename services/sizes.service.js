@@ -144,34 +144,55 @@ module.exports = {
 			let memBase = 25;
 			let cpuBase = 25;
 
+			// for (let i = 1; i < 20; i++) {
+
+			// 	let cpuCount = cpuBase * i;
+			// 	let memoryCount = memBase * i;
+			// 	sizes.push({
+			// 		name: `S${i}`,
+			// 		group: 'C',
+			// 		memory: memoryCount,
+			// 		swap: 1,
+			// 		memoryReservation: memoryCount - (10 / 100) * memoryCount,
+			// 		cpu: cpuCount,
+			// 		cpuReservation: cpuCount - (10 / 100) * cpuCount,
+			// 		ioBandwidth: 10,
+			// 		iops: 10,
+			// 		oomKillDisable: true,
+			// 		default: true
+			// 	})
+			// }
+
+			// memBase = 256;
+			// cpuBase = 500;
+			// for (let i = 1; i < 20; i++) {
+
+			// 	let cpuCount = cpuBase * i;
+			// 	let memoryCount = memBase * i;
+			// 	sizes.push({
+			// 		name: `N${i}`,
+			// 		group: 'N',
+			// 		memory: memoryCount,
+			// 		swap: 1,
+			// 		memoryReservation: memoryCount - (10 / 100) * memoryCount,
+			// 		cpu: cpuCount,
+			// 		cpuReservation: cpuCount - (10 / 100) * cpuCount,
+			// 		ioBandwidth: 10,
+			// 		iops: 10,
+			// 		oomKillDisable: true,
+			// 		default: true
+			// 	})
+			// }
+
+			memBase = 512;
+			cpuBase = 250;
 			for (let i = 1; i < 20; i++) {
 
 				let cpuCount = cpuBase * i;
 				let memoryCount = memBase * i;
 				sizes.push({
-					name: `S${i}`,
-					group: 'C',
-					memory: memoryCount,
-					swap: 1,
-					memoryReservation: memoryCount - (10 / 100) * memoryCount,
-					cpu: cpuCount,
-					cpuReservation: cpuCount - (10 / 100) * cpuCount,
-					ioBandwidth: 10,
-					iops: 10,
-					oomKillDisable: true,
-					default: true
-				})
-			}
-
-			memBase = 256;
-			cpuBase = 500;
-			for (let i = 1; i < 20; i++) {
-
-				let cpuCount = cpuBase * i;
-				let memoryCount = memBase * i;
-				sizes.push({
-					name: `N${i}`,
-					group: 'N',
+					name: `A${i}`,
+					group: 'A',
 					memory: memoryCount,
 					swap: 1,
 					memoryReservation: memoryCount - (10 / 100) * memoryCount,

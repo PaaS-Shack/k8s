@@ -198,12 +198,12 @@ module.exports = {
 		async seedDB() {
 			const limits = [{
 				max: {
-					cpu: "800",
-					memory: "2000"
+					cpu: "3800",
+					memory: "7000",
 				},
 				min: {
-					cpu: "50",
-					memory: "64"
+					cpu: "10",
+					memory: "10"
 				},
 				default: {
 					cpu: "300",
@@ -212,8 +212,8 @@ module.exports = {
 					//   "ephemeral-storage": "100Mi"
 				},
 				defaultRequest: {
-					cpu: "200",
-					memory: "100",
+					cpu: "50",
+					memory: "50",
 					// "ephemeral-storage": "100Mi"
 				},
 				maxLimitRequestRatio: {
@@ -222,17 +222,17 @@ module.exports = {
 				type: "Container"
 			}, {
 				max: {
-					cpu: "800",
-					memory: "2000",
+					cpu: "3800",
+					memory: "7000",
 					// "ephemeral-storage": "10Gi"
 				},
 				min: {
-					cpu: "50",
-					memory: "64"
+					cpu: "10",
+					memory: "10"
 				},
 				default: {
-					cpu: "300",
-					memory: "200",
+					cpu: "50",
+					memory: "50",
 					storage: "100",
 					// "ephemeral-storage": "100Mi"
 				},

@@ -17,7 +17,7 @@ module.exports = {
 		DbService({}),
 		Cron,
 		Membership({
-			permissions: 'namespaces.deployments'
+			permissions: 'deployments'
 		})
 	],
 
@@ -38,6 +38,7 @@ module.exports = {
 			name: {
 				type: "string",
 				required: true,
+				validate: "validateName",
 			},
 			uid: {
 				type: "string",
@@ -46,7 +47,7 @@ module.exports = {
 			replicas: {
 				type: 'number',
 				required: false,
-				default: 1
+				default: 0
 			},
 			revisionHistoryLimit: {
 				type: 'number',
@@ -66,7 +67,7 @@ module.exports = {
 			},
 			zone: {
 				type: 'enum',
-				values: ['ca', 'eu'],
+				values: ['ca', 'eu', 'nto'],
 				default: 'ca',
 				required: false
 			},
@@ -110,6 +111,17 @@ module.exports = {
 					}
 				},
 			},
+			repo: {
+				type: "string",
+				required: false,
+				populate: {
+					action: "v1.repos.resolve",
+					params: {
+						//fields: ["id", "online", "hostname", 'nodeID'],
+						//populate: ['network']
+					}
+				},
+			},
 			build: {
 				type: "string",
 				required: false,
@@ -120,6 +132,17 @@ module.exports = {
 						//populate: ['network']
 					}
 				},
+			},
+			vHosts: {
+				type: 'array',
+				items: "string",
+				optional: true,
+				populate: {
+					action: "v1.routes.resolve",
+					params: {
+						fields: ["id", "vHost", "strategy"]
+					}
+				}
 			},
 			routes: {
 				type: 'array',
@@ -132,7 +155,58 @@ module.exports = {
 					}
 				}
 			},
+			ingress: {
+				type: 'string',
+				optional: true,
+				populate: {
+					action: "v1.ingress.resolve",
+					params: {
 
+					}
+				},
+				onCreate: async ({ ctx, params, value }) => {
+					if (!params.router) {
+						const namespace = await ctx.call('v1.namespaces.resolve', {
+							id: params.namespace,
+							fields: ['cluster']
+						})
+						const ingress = await ctx.call('v1.ingress.shared', {
+							namespace: params.namespace,
+							cluster: namespace.cluster,
+							zone: params.zone
+						})
+						if (ingress) {
+							return ingress.id
+						}
+					}
+				}
+			},
+			router: {
+				type: 'string',
+				optional: true,
+				populate: {
+					action: "v1.routers.resolve",
+					params: {
+
+					}
+				},
+				onCreate: async ({ ctx, params, value }) => {
+					if (!params.router) {
+						const namespace = await ctx.call('v1.namespaces.resolve', {
+							id: params.namespace,
+							fields: ['cluster']
+						})
+						const router = await ctx.call('v1.routers.shared', {
+							namespace: params.namespace,
+							cluster: namespace.cluster,
+							zone: params.zone
+						})
+						if (router) {
+							return router.id
+						}
+					}
+				}
+			},
 			status: {
 				type: "object",
 				virtual: true,
@@ -142,20 +216,18 @@ module.exports = {
 						entities.map(async entity => {
 
 							if (entity.uid) {
-								return ctx.call('v1.kube.get', { uid: entity.uid })
-									.then((deployment) => `${deployment.status.availableReplicas}:${deployment.status.readyReplicas}:${deployment.status.replicas}:${deployment.status.observedGeneration}`)
+								return ctx.call('v1.kube.findOne', { _id: entity.uid })
+									.then((deployment) => `${deployment.status.availableReplicas ? deployment.status.availableReplicas : 0}:${deployment.status.readyReplicas ? deployment.status.readyReplicas : 0}:${deployment.status.replicas ? deployment.status.replicas : 0}:${deployment.status.observedGeneration}`)
 									.catch((err) => {
-										console.log(err)
 										return `Error: ${err.type}`
 									})
 							}
 
-							return ctx.call('v1.namespaces.resolve', { id: entity.namespace })
+							return ctx.call('v1.namespaces.resolve', { id: entity.namespace, fields: ['name', 'cluster'] })
 								.then((namespace) => {
-									return ctx.call("v1.kube.readNamespacedDeployment", { name: entity.name, namespace: namespace.name })
-										.then((deployment) => `${deployment.status.availableReplicas}:${deployment.status.readyReplicas}:${deployment.status.replicas}:${deployment.status.observedGeneration}`)
+									return ctx.call("v1.kube.readNamespacedDeployment", { name: entity.name, namespace: namespace.name, cluster: namespace.cluster })
+										.then((deployment) => `${deployment.status.availableReplicas ? deployment.status.availableReplicas : 0}:${deployment.status.readyReplicas ? deployment.status.readyReplicas : 0}:${deployment.status.replicas ? deployment.status.replicas : 0}:${deployment.status.observedGeneration}`)
 										.catch((err) => {
-											console.log(err)
 											return `Error: ${err.type}`
 										})
 								})
@@ -171,22 +243,78 @@ module.exports = {
 					return Promise.all(
 						entities.map(async entity => {
 							if (entity.uid) {
-								return ctx.call('v1.kube.get', { uid: entity.uid })
+								return ctx.call('v1.kube.findOne', { _id: entity.uid })
 									.then((deployment) => deployment.status)
 									.catch((err) => {
-										console.log(err)
 										return `Error: ${err.type}`
 									})
 							}
-							return ctx.call('v1.namespaces.resolve', { id: entity.namespace })
+							return ctx.call('v1.namespaces.resolve', { id: entity.namespace, fields: ['name', 'cluster'] })
 								.then((namespace) => {
-									return ctx.call("v1.kube.readNamespacedDeployment", { name: entity.name, namespace: namespace.name })
+									return ctx.call("v1.kube.readNamespacedDeployment", { name: entity.name, namespace: namespace.name, cluster: namespace.cluster })
 										.then((deployment) => deployment.status)
 										.catch((err) => {
-											console.log(err)
 											return `Error: ${err.type}`
 										})
 								})
+						})
+					);
+				}
+			},
+			cdi: {
+				type: "array",
+				virtual: true,
+				populate(ctx = this.broker, values, entities, field) {
+					if (!ctx) return null
+					return Promise.all(
+						entities.map(async entity => {
+							return ctx.call('v1.namespaces.cdi.find', {
+								query: { namespace: entity.namespace, deployment: this.encodeID(entity._id) },
+								populate: ['repo', 'build']
+							})
+						})
+					);
+				}
+			},
+			services: {
+				type: "array",
+				virtual: true,
+				populate(ctx = this.broker, values, entities, field) {
+					if (!ctx) return null
+					return Promise.all(
+						entities.map(async entity => {
+							return ctx.call('v1.namespaces.services.find', {
+								query: { namespace: entity.namespace, deployment: this.encodeID(entity._id), },
+								populate: ['record']
+							})
+						})
+					);
+				}
+			},
+			envs: {
+				type: "array",
+				virtual: true,
+				populate(ctx = this.broker, values, entities, field) {
+					if (!ctx) return null
+					return Promise.all(
+						entities.map(async entity => {
+							return ctx.call('v1.envs.find', {
+								query: { namespace: entity.namespace, deployment: this.encodeID(entity._id), }
+							})
+						})
+					);
+				}
+			},
+			builds: {
+				type: "array",
+				virtual: true,
+				populate(ctx = this.broker, values, entities, field) {
+					if (!ctx) return null
+					return Promise.all(
+						entities.map(async entity => {
+							return ctx.call('v1.builds.find', {
+								query: { namespaceID: entity.namespace, deploymentID: this.encodeID(entity._id) }
+							})
 						})
 					);
 				}
@@ -318,6 +446,8 @@ module.exports = {
 			}
 		},
 		buildRemote: {
+			rest: "POST /:id/build-remote",
+			permissions: ['namespaces.deployments.deployBuild'],
 			params: {
 				id: { type: "string", optional: false },
 				remote: { type: "string", empty: false, optional: false },
@@ -328,7 +458,7 @@ module.exports = {
 				const params = Object.assign({}, ctx.params);
 				const deployment = await this.resolveEntities(ctx, {
 					id: params.id,
-					populate: ['build', 'namespace']
+					populate: ['build', 'namespace', 'owner']
 				});
 				if (!deployment) {
 					throw new MoleculerClientError("deployment not found.", 400, "ERR_EMAIL_EXISTS");
@@ -338,11 +468,11 @@ module.exports = {
 				})
 
 				const build = await ctx.call('v1.builds.build', {
-					nodeID: deployment.build.nodeID,
-					registry: image.registry,
-					namespace: deployment.namespace.name,
+					registry: 'git.one-host.ca',
+					namespaceID: deployment.namespace.id,
+					deploymentID: deployment.id,
+					namespace: deployment.owner.username,
 					name: deployment.name,
-					tag: image.tag,
 					dockerFile: image.dockerFile,
 					remote: params.remote,
 					branch: params.branch,
@@ -354,6 +484,29 @@ module.exports = {
 					id: deployment.id,
 					build: build.id
 				})
+			}
+		},
+		deployBuild: {
+			rest: "POST /:id/deploy/:build",
+			permissions: ['namespaces.deployments.deployBuild'],
+			params: {
+				id: { type: "string", optional: false },
+				build: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, {
+					id: params.id,
+				});
+				const build = await ctx.call('v1.builds.resolve', {
+					id: params.build
+				})
+				await this.updateEntity(ctx, {
+					id: deployment.id,
+					build: build.id
+				})
+				return this.actions.deploy(params, { parentCtx: ctx })
 			}
 		},
 		deploy: {
@@ -374,29 +527,78 @@ module.exports = {
 					throw new MoleculerClientError("namespace not found.", 400, "ERR_EMAIL_EXISTS");
 				}
 
-				if (deployment.build && deployment.build.phase != 'pushed') {
-					throw new MoleculerClientError("build has not pushed yet..", 400, "ERR_EMAIL_EXISTS");
+				if (deployment.build && deployment.build.phase != 'succeeded') {
+					throw new MoleculerClientError("build has not succeeded yet..", 400, "ERR_EMAIL_EXISTS");
 				}
-
+				if (deployment.replicas == 0)
+					await this.updateEntity(ctx, {
+						id: deployment.id,
+						replicas: 1
+					});
 				const spec = await this.actions.podSpec(params, { parentCtx: ctx })
 
 				const found = await ctx.call('v1.kube.readNamespacedDeployment', {
 					namespace: deployment.namespace.name,
+					cluster: deployment.namespace.cluster,
 					name: deployment.name
 				}).catch(() => false)
 
 				if (found) {
 					return ctx.call('v1.kube.replaceNamespacedDeployment', {
 						namespace: deployment.namespace.name,
+						cluster: deployment.namespace.cluster,
 						name: deployment.name,
 						body: spec
 					})
 				} else {
 					return ctx.call('v1.kube.createNamespacedDeployment', {
 						namespace: deployment.namespace.name,
+						cluster: deployment.namespace.cluster,
 						name: deployment.name,
 						body: spec
 					})
+				}
+			}
+		},
+		stop: {
+			rest: "POST /:id/stop",
+			permissions: ['namespaces.deployments.deploy'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, {
+					id: params.id,
+					populate: ['namespace', 'build']
+				});
+
+				if (!deployment) {
+					throw new MoleculerClientError("namespace not found.", 400, "ERR_EMAIL_EXISTS");
+				}
+
+				await this.updateEntity(ctx, {
+					id: deployment.id,
+					replicas: 0
+				});
+
+				const found = await ctx.call('v1.kube.readNamespacedDeployment', {
+					namespace: deployment.namespace.name,
+					cluster: deployment.namespace.cluster,
+					name: deployment.name
+				}).catch(() => false)
+
+				if (found) {
+					const spec = await this.actions.podSpec(params, { parentCtx: ctx })
+					return ctx.call('v1.kube.replaceNamespacedDeployment', {
+						namespace: deployment.namespace.name,
+						cluster: deployment.namespace.cluster,
+						name: deployment.name,
+						body: spec
+					})
+				} else {
+					return found
 				}
 			}
 		},
@@ -409,18 +611,21 @@ module.exports = {
 
 				const deployment = await this.resolveEntities(ctx, {
 					id: params.id,
-					populate: ['namespace', 'build', 'image', 'size', 'owner', 'routes']
+					populate: ['namespace', 'build', 'image', 'size', 'owner']
 				});
 				if (!deployment) {
 					throw new MoleculerClientError("namespace not found.", 400, "ERR_EMAIL_EXISTS");
 				}
 
-
+				let image = `${deployment.image.registry}/${deployment.image.namespace}/${deployment.image.imageName}:${deployment.image.tag}`;
+				if (deployment.build) {
+					image = deployment.build.tag
+				}
 				const volumes = []
 
 				const container = {
 					"name": `${deployment.image.source}-${deployment.image.process}`,
-					"image": `${deployment.image.registry}/${deployment.image.namespace}/${deployment.image.imageName}:${deployment.image.tag}`,
+					"image": image,
 					"imagePullPolicy": deployment.image.pullPolicy,
 					"resources": {
 						"requests": {
@@ -428,8 +633,8 @@ module.exports = {
 							"cpu": `${deployment.size.cpu}m`
 						},
 						"limits": {
-							"memory": `${deployment.size.memoryReservation + deployment.size.memory}Mi`,
-							"cpu": `${deployment.size.cpuReservation + deployment.size.cpu}m`
+							"memory": `${deployment.size.memory}Mi`,
+							"cpu": `${deployment.size.cpu}m`
 						}
 					},
 					"volumeMounts": [],
@@ -441,26 +646,30 @@ module.exports = {
 					"ports": deployment.image.ports.map((port) => {
 						return {
 							"containerPort": port.internal,
-							"type": port.type,
+							"type": port.type == 'udp' ? 'udp' : 'tcp',
 							"name": port.name
 						}
 					})
 				}
 				console.log(container)
 
-				if (deployment.image.ports[0]) {
+				if (deployment.image.config?.Cmd) {
+
+					container.args = deployment.image.config.Cmd
+				}
+				if (false && deployment.image.ports[0]) {
 					container.livenessProbe = {
 						tcpSocket: {
 							port: deployment.image.ports[0].internal
 						},
-						initialDelaySeconds: 15,
+						initialDelaySeconds: 30,
 						periodSeconds: 20
 					}
 					container.readinessProbe = {
 						tcpSocket: {
 							port: deployment.image.ports[0].internal
 						},
-						initialDelaySeconds: 5,
+						initialDelaySeconds: 15,
 						periodSeconds: 10
 					}
 				}
@@ -492,7 +701,6 @@ module.exports = {
 						'k8s.one-host.ca/build': deployment.build?.id,
 						'k8s.one-host.ca/image': deployment.image.id,
 						'k8s.one-host.ca/size': deployment.size.id,
-						'k8s.one-host.ca/routes': deployment.routes.map((route) => route.id).join(',')
 					},
 					labels: selector
 				}
@@ -531,7 +739,8 @@ module.exports = {
 							spec: {
 								affinity,
 								containers,
-								volumes
+								volumes,
+								"imagePullSecrets": [{ name: 'registrypullsecret' }],
 							}
 						}
 					}
@@ -559,10 +768,14 @@ module.exports = {
 		},
 		async "namespaces.deployments.created"(ctx) {
 			const deployment = ctx.params.data;
-			const namespace = await ctx.call('v1.namespaces.resolve', { id: deployment.namespace })
+			const namespace = await ctx.call('v1.namespaces.resolve', {
+				id: deployment.namespace,
+				populate: ['owner', 'domain']
+			})
 			const image = await ctx.call('v1.images.resolve', { id: deployment.image })
 
 			this.logger.info(`Deployment(${deployment.id}) created for image ${image.id}`);
+
 
 			await ctx.call('v1.envs.create', {
 				key: 'DEPLOYMENT',
@@ -584,6 +797,7 @@ module.exports = {
 				const name = `${deployment.name}-${index}`;
 				await ctx.call('v1.namespaces.pvcs.create', {
 					namespace: namespace.name,
+					cluster: namespace.cluster,
 					name,
 					mountPath: element.local,
 					type: element.type == 'ssd' ? 'local' : 'remote',
@@ -592,16 +806,112 @@ module.exports = {
 
 				this.logger.info(`Deployment(${deployment.id}) PVC created ${name}`);
 			}
+
+			const servicePorts = image.ports.filter((p) => p.type == 'tcp' || p.type == 'udp')
+
+			if (servicePorts.length) {
+				
+				const ingress = await ctx.call('v1.ingress.resolve', {
+					id: deployment.ingress,
+					fields: ['ipv4']
+				})
+				const fqdn = `${deployment.name}.${namespace.name}.${deployment.zone}.${namespace.domain.domain}`
+
+
+				let record = await ctx.call('v1.domains.records.resolveRecord', {
+					domain: namespace.domain.id,
+					fqdn: fqdn,
+					type: 'A',
+					data: ingress.ipv4,
+				})
+				if (!record) {
+					record = await ctx.call('v1.domains.records.create', {
+						domain: namespace.domain.id,
+						fqdn: fqdn,
+						type: 'A',
+						data: ingress.ipv4,
+					})
+				}
+				await ctx.call('v1.namespaces.services.create', {
+					name: deployment.name,
+					namespace: namespace.id,
+					deployment: deployment.id,
+					ingress: deployment.ingress,
+					record: record.id,
+					ports: servicePorts
+				})
+			}
+
+			if (servicePorts.length) {
+
+
+			}
+
+
+
+			if (image.repo) {
+
+				const repoName = `${namespace.name}-${deployment.name}`
+
+				const repo = await ctx.call('v1.repos.create', {
+					name: repoName,
+					namespaceID: namespace.id,
+					deploymentID: deployment.id,
+					url: `https://git.one-host.ca/${namespace.owner.username}/${repoName}.git`,
+				})
+				await ctx.call('v1.namespaces.deployments.update', {
+					id: deployment.id,
+					repo: repo.id,
+					scope: ['-membership']
+				})
+				this.logger.info(`Deployment(${deployment.id}) repo(${repo.id}) created ${repo.url}`, repo);
+
+				const trigger = await ctx.call('v1.namespaces.cdi.create', {
+					name: 'dev',
+					branch: 'main',
+					namespace: namespace.id,
+					deployment: deployment.id,
+					repo: repo.id,
+				})
+				this.logger.info(`Deployment(${deployment.id}) repo(${repo.id}) trigger created ${trigger.id}`, trigger);
+			}
+
+
+
+			const spec = await this.actions.podSpec({
+				id: deployment.id
+			}, { parentCtx: ctx })
+
+			await ctx.call('v1.kube.createNamespacedDeployment', {
+				namespace: namespace.name,
+				cluster: namespace.cluster,
+				name: deployment.name,
+				body: spec
+			})
 		},
 		async "namespaces.deployments.removed"(ctx) {
 			const deployment = ctx.params.data;
-			const namespace = await ctx.call('v1.namespaces.resolve', { id: deployment.namespace })
+			const namespace = await ctx.call('v1.namespaces.resolve', {
+				id: deployment.namespace,
+				populate: ['domain']
+			})
 			const image = await ctx.call('v1.images.resolve', { id: deployment.image })
 
 			this.logger.info(`Deployment(${deployment.id}) removed for image ${image.id}`);
+			if (deployment.repo) {
+				await ctx.call('v1.repos.remove', {
+					id: deployment.repo
+				})
+				this.logger.info(`Deployment(${deployment.id}) removed repo ${deployment.repo}`);
+			}
+
+			if (deployment.ingress) {
+
+			}
 
 			await ctx.call('v1.kube.deleteNamespacedDeployment', {
 				namespace: namespace.name,
+				cluster: namespace.cluster,
 				name: deployment.name
 			});
 
@@ -611,13 +921,14 @@ module.exports = {
 				const name = `${deployment.name}-${index}`;
 				await ctx.call('v1.namespaces.pvcs.deleteNamespacedPVC', {
 					namespace: namespace.name,
+					cluster: namespace.cluster,
 					name
 				})
 
 				this.logger.info(`Deployment(${deployment.id}) PVC removed ${name}`);
 			}
 		},
-		async "builds.pushed"(ctx) {
+		async "builds.succeeded"(ctx) {
 			const build = ctx.params;
 			const deployment = await this.findEntity(null, {
 				scope: false,
@@ -713,100 +1024,11 @@ module.exports = {
 			return configMap
 		},
 
-		async podSpec(ctx, namespace, params, image, size) {
-
-			const key = `${params.id}:${params.name}`
-			const appName = `${image.source}-${image.process}-${params.name}`
-			const volumes = [];
-
-			for (let index = 0; index < image.envs.length; index++) {
-				const element = image.envs[index];
-				await ctx.call('v1.envs.create', {
-					...element,
-					reference: key,
-				})
-			}
-
-			const container = {
-				"name": `${image.source}-${image.process}`,
-				"image": `${image.name}`,
-				"imagePullPolicy": "Always",
-				"resources": {
-					"requests": {
-						"memory": `${size.memoryReservation}Mi`,
-						"cpu": `${size.cpuReservation}m`
-					},
-					"limits": {
-						"memory": `${size.memory}Mi`,
-						"cpu": `${size.cpu}m`
-					}
-				},
-				"volumeMounts": [],
-				"envFrom": [{
-					"configMapRef": {
-						"name": `${appName}-configmap`
-					}
-				}],
-				"ports": image.ports.map((port) => {
-					return {
-						"containerPort": port.internal,
-						"type": port.type
-					}
-				}),
-				livenessProbe: {
-					tcpSocket: {
-						port: image.ports[0].internal
-					},
-					initialDelaySeconds: 15,
-					periodSeconds: 20
-				},
-				readinessProbe: {
-					tcpSocket: {
-						port: image.ports[0].internal
-					},
-					initialDelaySeconds: 5,
-					periodSeconds: 10
-				},
-			}
-
-			for (let index = 0; index < image.volumes.length; index++) {
-				const element = image.volumes[index];
-				const name = `${appName}-${index}`;
-				const options = {
-					namespace: namespace.name,
-					name,
-					type: element.type == 'ssd' ? 'local' : 'remote',
-					size: 1000,
-				}
-				let claim = await ctx.call('v1.namespaces.pvcs.readNamespacedPVC', options).catch(() => null)
-				if (!claim) {
-					claim = await ctx.call('v1.namespaces.pvcs.createNamespacedPVC', {
-						namespace: namespace.name,
-						name,
-						type: element.type == 'ssd' ? 'local' : 'remote',
-						size: 1000,
-					})
-				}
-
-				volumes.push({
-					name,
-					persistentVolumeClaim: {
-						claimName: claim.metadata.name
-					}
-				})
-				container.volumeMounts.push({
-					name,
-					mountPath: element.local
-				})
-
-			}
-
-			return {
-				appName,
-				volumes,
-				containers: [container],
-				configMap
-			}
+		async validateName({ ctx, value, params, id, entity }) {
+			return ctx.call("v1.namespaces.deployments.find", {
+				query: { name: params.name },
+				namespace: params.namespace,
+			}).then((res) => res.length ? `Name already used in this namespace` : true)
 		},
 	},
 	/**

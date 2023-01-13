@@ -37,17 +37,53 @@ module.exports = {
 
 		fields: {
 
-			name: {
+			vHost: {
 				type: "string",
 				required: true,
 			},
 			namespace: {
 				type: "string",
 				required: true,
+				populate: {
+					action: "v1.namespaces.resolve",
+					params: {
+						scaope: false,
+						//fields: ["id", "online", "hostname", 'nodeID'],
+						//populate: ['network']
+					}
+				},
+			},
+			deployment: {
+				type: "string",
+				required: true,
+				populate: {
+					action: "v1.namespaces.deployments.resolve",
+					params: {
+						scaope: false,
+						//fields: ["id", "online", "hostname", 'nodeID'],
+						//populate: ['network']
+					}
+				},
 			},
 			route: {
 				type: "string",
 				required: true,
+				populate: {
+					action: "v1.routes.resolve",
+					params: {
+						scaope: false,
+					}
+				},
+			},
+			record: {
+				type: "string",
+				required: false,
+				populate: {
+					action: "v1.domains.records.resolve",
+					params: {
+						scaope: false,
+					}
+				},
 			},
 
 			options: { type: "object" },
@@ -123,7 +159,7 @@ module.exports = {
 				})
 				const envSchema = deployment.image.envs.find((env) => env.key == params.key)
 
-				return `${envSchema.value.replace('${VHOST}', deployment.routes[params.index].vHost)}`
+				return `${envSchema.value.replace('${VHOST}', deployment.vHosts[params.index])}`
 			}
 		},
 	},
@@ -140,15 +176,75 @@ module.exports = {
 				.then(() =>
 					this.logger.info(`ROUTE namespace remove event for ${namespace.name}`))
 		},
+		async "namespaces.deployments.created"(ctx) {
+			const deployment = ctx.params.data;
+
+			const options = { meta: { userID: deployment.owner } };
+
+			const routes = []
+
+			for (let index = 0; index < deployment.vHosts.length; index++) {
+				const vHost = deployment.vHosts[index];
+
+				const found = await ctx.call('v1.routes.resolveRoute', {
+					vHost
+				}, options);
+
+				if (found) {
+					const entity = await ctx.call('v1.namespaces.routes.create', {
+						vHost,
+						route: found.id,
+						deployment: deployment.id,
+						namespace: deployment.namespace
+					}, options)
+					this.logger.info(`Add found route ${found.id} id ${entity.id} on deployment ${deployment.id}`)
+				} else {
+					const route = await ctx.call('v1.routes.create', {
+						vHost
+					}, options);
+					const entity = await ctx.call('v1.namespaces.routes.create', {
+						vHost,
+						route: route.id,
+						deployment: deployment.id,
+						namespace: deployment.namespace
+					}, options)
+					this.logger.info(`Add new route ${route.id} id ${entity.id} on deployment ${deployment.id}`)
+				}
+			}
+
+		},
+		async "namespaces.deployments.removed"(ctx) {
+			const deployment = ctx.params.data;
+
+			const options = { meta: { userID: deployment.owner } };
+
+
+			const routes = await this.findEntities(ctx, {
+				query: {
+					deployment: deployment.id,
+					namespace: deployment.namespace
+				}
+			})
+
+			for (let index = 0; index < routes.length; index++) {
+				const { id, route } = routes[index];
+				await ctx.call('v1.routes.remove', {
+					id: route
+				}, options);
+				await this.removeEntity(ctx, { id })
+				this.logger.info(`Remove route ${route} id ${id} on deployment ${deployment.id}`)
+			}
+
+		},
 		async "pods.containers.running"(ctx) {
 			const container = ctx.params;
-			if (container.annotations && container.annotations['k8s.one-host.ca/routes']) {
+			if (container.annotations && container.annotations['k8s.one-host.ca/deployment']) {
 				await this.containerStateProcess(ctx, 'running', container)
 			}
 		},
 		async "pods.containers.terminated"(ctx) {
 			const container = ctx.params;
-			if (container.annotations && container.annotations['k8s.one-host.ca/routes']) {
+			if (container.annotations && container.annotations['k8s.one-host.ca/deployment']) {
 				await this.containerStateProcess(ctx, 'terminated', container)
 			}
 		}
@@ -160,23 +256,39 @@ module.exports = {
 	methods: {
 		async containerStateProcess(ctx, state, container) {
 
-			const routeIDs = container.annotations['k8s.one-host.ca/routes'].split(',')
 			const promises = []
-			const options = { meta: { userID: container.annotations['k8s.one-host.ca/owner'] } }
+			const options = { meta: { userID: container.annotations['k8s.one-host.ca/owner'] } };
+
+			const namespace = await ctx.call('v1.namespaces.resolve', {
+				id: container.annotations['k8s.one-host.ca/namespace'],
+				fields: ['cluster']
+			}, options)
+			const image = await ctx.call('v1.images.resolve', {
+				id: container.annotations['k8s.one-host.ca/image']
+			}, options)
+			const routes = await ctx.call('v1.namespaces.routes.find', {
+				query: {
+					namespace: container.annotations['k8s.one-host.ca/namespace'],
+					deployment: container.annotations['k8s.one-host.ca/deployment'],
+				}
+			}, options)
 
 			await this.lock.acquire()
 
-			for (let index = 0; index < routeIDs.length; index++) {
-				const route = routeIDs[index];
-				for (let i = 0; i < container.ports.length; i++) {
-					const port = container.ports[i];
+			const routePorts = image.ports.filter((p) => p.type == 'http' || p.type == 'https')
 
+			for (let index = 0; index < routePorts.length; index++) {
+				const port = routePorts[index];
+				const containerPort = container.ports.find((pp) => pp.port == port.internal)
+				for (let i = 0; i < routes.length; i++) {
+					const { route, vHost } = routes[i];
 					const query = {
-						route,
-						hostname: port.hostname,
-						port: port.port,
-						cluster: 'cloud1'
+						hostname: containerPort.hostname,
+						port: containerPort.port,
+						cluster: namespace.cluster,
+						route: route
 					}
+
 
 					if (state == 'terminated') {
 						promises.push(ctx.call('v1.routes.hosts.resolveHost', query, options)
@@ -197,6 +309,8 @@ module.exports = {
 					}
 				}
 			}
+
+
 
 			const result = await Promise.allSettled(promises)
 

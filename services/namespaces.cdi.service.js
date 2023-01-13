@@ -82,6 +82,16 @@ module.exports = {
 				default: 'master',
 				required: false,
 			},
+			build: {
+				type: "string",
+				required: false,
+				populate: {
+					action: "v1.builds.resolve",
+					params: {
+
+					}
+				},
+			},
 
 			options: { type: "object" },
 			createdAt: {
@@ -102,7 +112,7 @@ module.exports = {
 			},
 			...Membership.FIELDS,
 		},
-		defaultPopulates: ['status'],
+		defaultPopulates: ['build'],
 
 		scopes: {
 			notDeleted: { deletedAt: null },
@@ -151,7 +161,7 @@ module.exports = {
 			return Promise.allSettled(entities.map((entity) =>
 				this.removeEntity(ctx, { scope: false, id: entity.id })))
 				.then(() =>
-					this.logger.info(`CDI namespace remove event for ${namespace.name}`))
+					this.logger.info(`namespace remove event for ${namespace.name}`))
 		},
 		async "namespaces.deployments.removed"(ctx) {
 			const deployment = ctx.params.data;
@@ -159,35 +169,40 @@ module.exports = {
 			return Promise.allSettled(entities.map((entity) =>
 				this.removeEntity(ctx, { scope: false, id: entity.id })))
 				.then(() =>
-					this.logger.info(`CDI deployment remove event for ${deployment.name}`))
+					this.logger.info(`deployment remove event for ${deployment.name}`))
 		},
 		async "repos.commits.created"(ctx) {
 			const commit = ctx.params.data;
-			const repo = await ctx.call('v1.repos.resolve', { id: commit.repo })
-			const entities = await this.findEntities(null, {
+			const options = { meta: { userID: commit.owner } }
+			const repo = await ctx.call('v1.repos.resolve', {
+				id: commit.repo,
+				scope: '-membership'
+			})
+			const entities = await this.findEntities(ctx, {
 				query: {
 					repo: commit.repo,
-					deletedAt: null
-				}, scope: false
+				},
+				populate: ['build'],
+				scope: '-membership'
 			});
-
+			this.logger.info(`Commit actions found ${entities.length}`, commit)
 
 			for (let index = 0; index < entities.length; index++) {
 				const entity = entities[index];
-				console.log(repo,commit,entity)
-				continue;
-				const token = await ctx.call('v1.repos.git.agent.gitRequestToken', {
-					name: repo.name
-				})
-
-
-				console.log(entity)
-				console.log(await ctx.call('v1.namespaces.deployments.buildRemote', {
+				const deployment = await ctx.call('v1.namespaces.deployments.buildRemote', {
 					id: entity.deployment,
-					remote: token.path,
+					remote: repo.url,
 					branch: entity.branch,
 					commit: commit.hash,
-				}))
+				}, options)
+
+				await this.updateEntity(ctx, {
+					id: entity.id,
+					build: deployment.build,
+					scope: '-membership'
+				})
+				this.logger.info(`${entity.name}/${entity.branch} trigger new build ${deployment.build}`)
+
 			}
 
 		}

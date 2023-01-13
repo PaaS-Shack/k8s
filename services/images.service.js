@@ -96,6 +96,11 @@ module.exports = {
 				nullable: true,
 				required: false
 			},
+			repo: {
+				type: "boolean",
+				default: false,
+				required: false
+			},
 			size: {
 				type: "string",
 				required: true,
@@ -321,7 +326,7 @@ module.exports = {
 					size: 'S1',
 					ports: [{
 						internal: 80,
-						type: 'tcp',
+						type: 'http',
 					}],
 					links: [],
 					envs: [
@@ -369,7 +374,7 @@ module.exports = {
 					size: 'S1',
 					ports: [{
 						internal: 5000,
-						type: 'tcp',
+						type: 'http',
 					}],
 					links: [],
 					envs: [
@@ -397,6 +402,7 @@ module.exports = {
 					size: 'S3',
 					ports: [{
 						internal: 80,
+						type: 'http',
 					}],
 					links: [],
 					envs: [
@@ -405,7 +411,7 @@ module.exports = {
 							value: 'JGwP7rbJ4KtdZ1gEANrQ',
 							type: 'provision'
 						}, {
-							key: 'MATOMO_DATABASE_HOST',
+							key: 'MYSQL_CLIENT_DATABASE_HOST',
 							value: 'MYSQL_HOST',
 							type: 'map'
 						}, {
@@ -426,6 +432,9 @@ module.exports = {
 						}, {
 							key: 'MATOMO_ENABLE_ASSUME_SECURE_PROTOCOL',
 							value: 'yes'
+						}, {
+							key: 'MYSQL_CLIENT_FLAVOR',
+							value: 'mysql'
 						}
 					],
 					volumes: [{
@@ -449,14 +458,12 @@ module.exports = {
 					process: "web",
 					size: 'S1',
 					ports: [{
-						external: 0,
 						internal: 9000,
-						type: 'tcp',
+						type: 'http',
 						name: 'frontend',
 					}, {
-						external: 0,
 						internal: 9001,
-						type: 'tcp',
+						type: 'http',
 						name: 'backend',
 						subdomain: 'console',
 					}],
@@ -500,9 +507,8 @@ module.exports = {
 					process: "web",
 					size: 'S2',
 					ports: [{
-						external: 0,
 						internal: 3000,
-						type: 'tcp',
+						type: 'http',
 						name: 'frontend',
 					}],
 					links: [],
@@ -535,7 +541,148 @@ module.exports = {
 						local: '/data'
 					}]
 				}
-				let imageConfig = [gitea]
+
+				const devNodeJS = {
+					name: 'dev-nodejs',
+					imageName: 'dev-nodejs',
+					namespace: 'onehost',
+					tag: '0.0.1',
+					registry: 'git.one-host.ca',
+					remote: {
+
+					},
+					dockerFile: '/Dockerfile',
+					source: "frontend",
+					process: "web",
+					size: 'S10',
+					ports: [{
+						internal: 8080,
+						type: 'http',
+					}],
+					links: [],
+					envs: [],
+					volumes: [{
+						type: 'remote',
+						local: '/mnt/remote'
+					}, {
+						type: 'ssd',
+						local: '/mnt/local'
+					}]
+				}
+
+				const uptimekuma = {
+					name: 'uptime-kuma',
+					imageName: 'uptime-kuma',
+					namespace: 'louislam',
+					tag: '1',
+					registry: 'docker.io',
+					remote: {
+
+					},
+					dockerFile: '/Dockerfile',
+					source: "frontend",
+					process: "web",
+					size: 'S5',
+					ports: [{
+						internal: 3001,
+						type: 'http',
+					}],
+					links: [],
+					envs: [],
+					volumes: [{
+						type: 'remote',
+						local: '/app/data'
+					}]
+				}
+				const nextcloud = {
+					name: 'nextcloud',
+					imageName: 'nextcloud',
+					namespace: 'library',
+					tag: 'fpm',
+					registry: 'docker.io',
+					remote: {
+						path: 'https://github.com/docker/distribution-library-image.git',
+						branch: 'master',
+						commit: '0be0d08b29d56bb1ef0fab93c751ca92d6976a19',
+					},
+					dockerFile: '/Dockerfile',
+					source: "frontend",
+					process: "web",
+					size: 'S3',
+					ports: [{
+						internal: 80,
+						type: 'http',
+					}],
+					links: [],
+					envs: [
+						{
+							key: 'mysql',
+							value: 'JGwP7rbJ4KtdZ1gEANrQ',
+							type: 'provision'
+						}, {
+							key: 'MATOMO_DATABASE_NAME',
+							value: 'MYSQL_DATABASE',
+							type: 'map'
+						}, {
+							key: 'MYSQL_USER',
+							value: 'MYSQL_USERNAME',
+							type: 'map'
+						}, {
+							key: 'VIRTUAL_HOST',
+							value: '${VHOST}',
+							type: 'route'
+						}
+					],
+					volumes: [{
+						type: 'ssd',
+						local: '/var/www/html'
+					}]
+				}
+				const mysql = {
+					name: 'mysql:8.0.28-debian',
+					imageName: 'mysql',
+					namespace: 'library',
+					tag: '8.0.28-debian',
+					registry: 'docker.io',
+					remote: {
+						path: 'https://github.com/docker-library/mysql.git',
+						branch: 'master',
+						commit: 'e4b225b3eed5c774fa11799f04832e0ad351da62',
+					},
+					dockerFile: '/Dockerfile',
+					source: "database",
+					process: "mysql",
+					size: 'N5',
+					ports: [{
+						internal: 3306,
+						type: 'tcp',
+					}],
+					envs: [
+						{
+							key: 'MYSQL_ROOT_PASSWORD',
+							type: 'secret'
+						}
+					],
+					volumes: [
+						{
+							local: '/var/lib/mysql',
+							type: 'ssd'
+						}
+					]
+				}
+
+
+				let imageConfig = [
+					wordpress,
+					registry,
+					matomo,
+					minio,
+					gitea,
+					devNodeJS,
+					uptimekuma,
+					nextcloud,
+					//mysql,
+				]
 				let results = []
 				for (let index = 0; index < imageConfig.length; index++) {
 					results.push(await ctx.call('v1.images.create', imageConfig[index]).catch((err) => {

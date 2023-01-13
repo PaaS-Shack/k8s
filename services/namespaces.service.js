@@ -15,7 +15,6 @@ module.exports = {
 
 	mixins: [
 		DbService({}),
-		Cron,
 		Membership({
 			permissions: 'namespaces'
 		})
@@ -38,6 +37,7 @@ module.exports = {
 			name: {
 				type: "string",
 				required: true,
+				validate: "validateName",
 			},
 			description: {
 				type: "string",
@@ -55,12 +55,12 @@ module.exports = {
 					return Promise.all(
 						entities.map(async entity => {
 							if (entity.uid) {
-								return ctx.call('v1.kube.get', { uid: entity.uid })
+								return ctx.call('v1.kube.findOne', { _id: entity.uid, fields: ['status.phase'] })
 									.then((namespace) => namespace.status.phase)
 									.catch((err) => err.type)
 							}
 							return (ctx || this.broker)
-								.call("v1.kube.readNamespace", { name: entity.name })
+								.call("v1.kube.readNamespace", { name: entity.name, cluster: entity.cluster })
 								.then((namespace) => namespace.status.phase)
 								.catch((err) => err.type)
 						})
@@ -74,16 +74,17 @@ module.exports = {
 					return Promise.all(
 						entities.map(async entity => {
 							if (entity.uid) {
-								return ctx.call('v1.kube.get', {
+								return ctx.call('v1.kube.findOne', {
 									kind: 'ResourceQuota',
-									namespace: entity.name
+									'metadata.namespace': entity.name,
+									fields: ['status']
 								}).then((res) => {
-									return res.shift().status
+									return res.status
 								})
 									.catch((err) => err.type)
 							}
 							return (ctx || this.broker)
-								.call('v1.kube.readNamespacedResourceQuota', { namespace: entity.name, name: `${entity.name}-resourcequota` })
+								.call('v1.kube.readNamespacedResourceQuota', { namespace: entity.name, name: `${entity.name}-resourcequota`, cluster: entity.cluster })
 								.then((namespace) => namespace.status)
 								.catch((err) => err.type)
 						})
@@ -111,15 +112,23 @@ module.exports = {
 				},
 				validate: "validateDomain",
 			},
+			ingress: {
+				type: "array",
+				virtual: true,
+				populate: {
+					action: "v1.ingress.list",
+					params: {
+						//fields: ["id", "hostname", "port"]
+					}
+				}
+			},
 			zone: {
 				type: "string",
 				required: true,
-				populate: {
-					action: "v1.zones.resolve",
-					params: {
-						//fields: ["id", "username", "fullName", "avatar"]
-					}
-				},
+			},
+			cluster: {
+				type: "string",
+				required: true,
 			},
 			options: { type: "object" },
 			createdAt: {
@@ -150,15 +159,6 @@ module.exports = {
 		defaultScopes: ["notDeleted", ...Membership.DSCOPE]
 	},
 
-	crons: [
-		{
-			name: "Starting all services",
-			cronTime: "*/30 * * * *",
-			onTick: {
-				//action: "v1.services.startAll"
-			}
-		}
-	],
 	/**
 	 * Actions
 	 */
@@ -234,77 +234,6 @@ module.exports = {
 				return namespace
 			}
 		},
-		deployImage: {
-			params: {
-				id: { type: "string", optional: false },
-				name: { type: "string", optional: false },
-				size: { type: "string", optional: false },
-				image: { type: "string", optional: false },
-			},
-			async handler(ctx) {
-				const params = Object.assign({}, ctx.params);
-
-				const namespace = await this.resolveEntities(ctx, {
-					id: params.id,
-				});
-
-				if (!namespace)
-					throw new MoleculerClientError("namespace not found.", 400, "ERR_EMAIL_EXISTS");
-
-				const size = await ctx.call('v1.sizes.getSize', { name: params.size })
-
-				const image = await ctx.call('v1.images.resolve', { id: params.image })
-
-				const key = `${params.id}:${params.name}`
-				const appName = `${image.source}-${image.process}-${params.name}`
-
-				const selector = {
-					app: appName,
-					tier: "frontend"
-				}
-				const metadata = {
-					name: appName,
-					labels: {
-						app: appName
-					}
-				}
-
-				const deployment = {
-					apiVersion: "apps/v1",
-					kind: "Deployment",
-					metadata,
-					spec: {
-						selector: {
-							matchLabels: selector
-						},
-						strategy: {
-							type: "Recreate"
-						},
-						template: {
-							metadata: {
-								labels: selector
-							},
-							spec: {
-								containers: [],
-								volumes: []
-							}
-						}
-					}
-				}
-				const spec = await this.podSpec(ctx, namespace, params, image, size)
-
-				deployment.spec.template.spec.volumes = spec.volumes
-				deployment.spec.template.spec.containers = [spec.container]
-
-
-				return ctx.call('v1.kube.createNamespacedDeployment', {
-					namespace: namespace.name,
-					body: deployment
-				})
-			}
-		},
-
-
 	},
 
 	/**
@@ -354,33 +283,42 @@ module.exports = {
 				}
 			}
 
-			await ctx.call('v1.kube.createNamespace', { body: Namespace })
-			await ctx.call('v1.kube.createNamespacedLimitRange', { namespace: name, body: LimitRange })
-			await ctx.call('v1.kube.createNamespacedResourceQuota', { namespace: name, body: ResourceQuota })
-
+			this.logger.info(`Creating namespace ${namespace.name} on cluster ${namespace.cluster}`)
+			await ctx.call('v1.kube.createNamespace', { body: Namespace, cluster: namespace.cluster }).catch(() => null);
+			await ctx.call('v1.kube.createNamespacedLimitRange', { namespace: name, body: LimitRange, cluster: namespace.cluster }).catch(() => null);
+			await ctx.call('v1.kube.createNamespacedResourceQuota', { namespace: name, body: ResourceQuota, cluster: namespace.cluster }).catch(() => null);
 		},
 		async "namespaces.removed"(ctx) {
 			const namespace = ctx.params.data;
 			const name = namespace.name
-			await ctx.call('v1.kube.deleteNamespace', { name })
-			await ctx.call('v1.kube.deleteNamespacedLimitRange', { namespace: name, name: `${name}-limitrange` })
-			await ctx.call('v1.kube.deleteNamespacedResourceQuota', { namespace: name, name: `${name}-resourcequota` })
+			this.logger.info(`Removing namespace ${namespace.name} on cluster ${namespace.cluster}`)
+			await ctx.call('v1.kube.deleteNamespace', { name, cluster: namespace.cluster })
+			await ctx.call('v1.kube.deleteNamespacedLimitRange', { namespace: name, name: `${name}-limitrange`, cluster: namespace.cluster })
+			await ctx.call('v1.kube.deleteNamespacedResourceQuota', { namespace: name, name: `${name}-resourcequota`, cluster: namespace.cluster })
 		},
 		async "kube.namespaces.added"(ctx) {
-			const namespace = ctx.params;
-			if (namespace.metadata.annotations && namespace.metadata.annotations['k8s.one-host.ca/id'])
-				await ctx.call('v1.namespaces.update', {
-					id: namespace.metadata.annotations['k8s.one-host.ca/id'],
-					uid: namespace.metadata.uid
-				}, { meta: { userID: namespace.metadata.annotations['k8s.one-host.ca/owner'] } })
+			const resource = ctx.params;
+			if (resource.metadata.annotations && resource.metadata.annotations['k8s.one-host.ca/id']) {
+				const namespace = await ctx.call('v1.namespaces.update', {
+					id: resource.metadata.annotations['k8s.one-host.ca/id'],
+					uid: resource.metadata.uid
+				}, { meta: { userID: resource.metadata.annotations['k8s.one-host.ca/owner'] } })
+
+				this.logger.info(`Kube has created namespace ${namespace.name} on cluster ${namespace.cluster} ${namespace.uid}`)
+			}
 		},
 		async "kube.namespaces.deleted"(ctx) {
-			const namespace = ctx.params;
-			if (namespace.metadata.annotations && namespace.metadata.annotations['k8s.one-host.ca/id'])
-				await ctx.call('v1.namespaces.update', {
-					id: namespace.metadata.annotations['k8s.one-host.ca/id'],
-					uid: null
-				}, { meta: { userID: namespace.metadata.annotations['k8s.one-host.ca/owner'] } })
+			const resource = ctx.params;
+			console.log(resource)
+			if (resource.metadata.annotations && resource.metadata.annotations['k8s.one-host.ca/id']) {
+				const namespace = await ctx.call('v1.namespaces.update', {
+					id: resource.metadata.annotations['k8s.one-host.ca/id'],
+					uid: null,
+					scope: false
+				}, { meta: { userID: resource.metadata.annotations['k8s.one-host.ca/owner'] } })
+
+				this.logger.info(`Kube has deleted namespace ${namespace.name} on cluster ${namespace.cluster} ${namespace.uid}`)
+			}
 		},
 	},
 
@@ -389,160 +327,15 @@ module.exports = {
 	 */
 	methods: {
 
-		async podSpec(ctx, namespace, params, image, size) {
-
-			const key = `${params.id}:${params.name}`
-			const appName = `${image.source}-${image.process}-${params.name}`
-			const volumes = [];
-
-			const container = {
-				"name": `${image.source}-${image.process}`,
-				"image": `${image.name}`,
-				"imagePullPolicy": "Always",
-				"ports": image.ports.map((port) => {
-					return {
-						"containerPort": port.internal,
-						"type": port.type
-					}
-				}),
-				"resources": {
-					"requests": {
-						"memory": `${size.memoryReservation}Mi`,
-						"cpu": `${size.cpuReservation}m`
-					},
-					"limits": {
-						"memory": `${size.memory}Mi`,
-						"cpu": `${size.cpu}m`
-					}
-				},
-				"volumeMounts": [],
-				"envFrom": [{
-					"configMapRef": {
-						"name": configMap.metadata.name
-					}
-				}]
-			}
-
-			for (let index = 0; index < image.volumes.length; index++) {
-				const element = image.volumes[index];
-				const name = `${appName}-${index}`
-				const claim = await ctx.call('v1.namespaces.pvcs.createNamespacedPVC', {
-					namespace: namespace.name,
-					name,
-					type: element.type == 'ssd' ? 'local' : 'remote',
-					size: 1000,
-				})
-
-				volumes.push({
-					name,
-					persistentVolumeClaim: {
-						claimName: claim.metadata.name
-					}
-				})
-				container.volumeMounts.push({
-					name,
-					mountPath: element.local
-				})
-
-			}
-
-			for (let index = 0; index < image.envs.length; index++) {
-				const element = image.envs[index];
-				await ctx.call('v1.envs.create', {
-					...element,
-					reference: key,
-				})
-			}
-
-			return {
-				appName,
-				volumes,
-				container
-			}
-		},
-		async generateNamespacedService(ctx, namespace, params) {
-			const selector = {
-				app: params.name,
-				tier: "frontend"
-			}
-			const metadata = {
-				name: params.name,
-				labels: {
-					app: params.name
-				}
-			}
-
-			return {
-				apiVersion: "v1",
-				kind: "Service",
-				metadata,
-				spec: {
-					ports: [{
-						port: params.port
-					}],
-					selector,
-					type: "NodePort"
-				}
-			}
-		},
-		async generateNamespacedPVC(ctx, namespace, params) {
-
-			const claimName = `${params.name}-pv-claim`
-
-			let storageClassName = ''
-			if (params.type == 'local') {
-				storageClassName = 'local-path'
-			} else if (params.type == 'remote') {
-				storageClassName = 'nfs-client'
-			}
-
-			return {
-				apiVersion: "v1",
-				kind: "PersistentVolumeClaim",
-				metadata: {
-					name: claimName
-				},
-				spec: {
-					storageClassName,
-					accessModes: ["ReadWriteMany"],
-					resources: {
-						requests: {
-							storage: `${params.size}Mi`
-						}
-					}
-				}
-			}
-		},
-		async generateNamespace(ctx, namespace) {
-			return {
-				"apiVersion": "v1",
-				"kind": "Namespace",
-				"metadata": {
-					"name": `${namespace.name}`
-				}
-			}
-		},
-		async generateNamespaceResourceQuota(ctx, namespace, size) {
-			return {
-				"apiVersion": "v1",
-				"kind": "ResourceQuota",
-				"metadata": {
-					"name": `${namespace.name}`
-				},
-				"spec": {
-					"hard": {
-						"requests.cpu": `${size.cpu}m`,
-						"requests.memory": `${size.cpu}Mi`,
-						"limits.cpu": `${size.cpuReservation}m`,
-						"limits.memory": `${size.memoryReservation}Mi`
-					}
-				}
-			}
-		},
-
 		async validateDomain({ ctx, value, params, id, entity }) {
 			return ctx.call("v1.domains.resolve", { id: params.domain })
 				.then((res) => res ? true : `No permissions '${value} not found'`)
+		},
+		async validateName({ ctx, value, params, id, entity }) {
+			return ctx.call("v1.namespaces.find", {
+				query: { name: params.name },
+				scope: '-membership'
+			}).then((res) => res.length ? `Name already used` : true)
 		},
 	},
 	/**

@@ -43,6 +43,10 @@ module.exports = {
 				type: "string",
 				required: true,
 			},
+			cluster: {
+				type: "string",
+				required: true,
+			},
 			size: {
 				type: "number",
 				convert: true,
@@ -65,7 +69,7 @@ module.exports = {
 					return Promise.all(
 						entities.map(async entity => {
 							return (ctx || this.broker)
-								.call("v1.namespaces.pvcs.readNamespacedPVC", { name: entity.name, namespace: entity.namespace })
+								.call("v1.namespaces.pvcs.readNamespacedPVC", { name: entity.name, namespace: entity.namespace, cluster: entity.cluster })
 								.then((pvc) => pvc.status)
 								.catch((err) => err.type)
 						})
@@ -134,13 +138,14 @@ module.exports = {
             params: {
                 namespace: { type: "string", optional: false },
                 name: { type: "string", optional: false },
+                cluster: { type: "string", optional: false },
             },
             async handler(ctx) {
                 const params = Object.assign({}, ctx.params);
                 const results = []
                 const claimName = `${params.name}-pv-claim`
 
-                return ctx.call('v1.kube.deleteNamespacedPersistentVolumeClaim', { namespace: params.namespace, name: claimName })
+                return ctx.call('v1.kube.deleteNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, name: claimName })
             }
         },
         readNamespacedPVC: {
@@ -148,13 +153,14 @@ module.exports = {
             params: {
                 namespace: { type: "string", optional: false },
                 name: { type: "string", optional: false },
+                cluster: { type: "string", optional: false },
             },
             async handler(ctx) {
                 const params = Object.assign({}, ctx.params);
                 const results = []
                 const claimName = `${params.name}-pv-claim`;
 
-                return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', { namespace: params.namespace, name: claimName })
+                return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, name: claimName })
             }
         },
         createNamespacedPVC: {
@@ -162,6 +168,7 @@ module.exports = {
             params: {
                 namespace: { type: "string", optional: false },
                 name: { type: "string", optional: false },
+                cluster: { type: "string", optional: false },
                 type: { type: "enum", values: ['local', 'remote'], default: 'remote', optional: true },
                 size: { type: "number", default: 1000, optional: true },
             },
@@ -170,12 +177,7 @@ module.exports = {
                 const results = []
                 const claimName = `${params.name}-pv-claim`
 
-                let storageClassName = ''
-                if (params.type == 'local') {
-                    storageClassName = 'local-path'
-                } else if (params.type == 'remote') {
-                    storageClassName = 'nfs-client'
-                }
+                let storageClassName = 'longhorn';
 
                 const PersistentVolumeClaim = {
                     apiVersion: "v1",
@@ -185,7 +187,7 @@ module.exports = {
                     },
                     spec: {
                         storageClassName,
-                        accessModes: [params.type == 'local' ? "ReadWriteOnce" : "ReadWriteMany"],
+                        accessModes: ["ReadWriteMany"],
                         resources: {
                             requests: {
                                 storage: `${params.size}Mi`
@@ -194,7 +196,7 @@ module.exports = {
                     }
                 }
 
-                return ctx.call('v1.kube.createNamespacedPersistentVolumeClaim', { namespace: params.namespace, body: PersistentVolumeClaim })
+                return ctx.call('v1.kube.createNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, body: PersistentVolumeClaim })
             }
         },
 	},
@@ -208,6 +210,7 @@ module.exports = {
 			
 			const claim = await ctx.call('v1.namespaces.pvcs.createNamespacedPVC', {
 				namespace: pvc.namespace,
+				cluster: pvc.cluster,
 				name: pvc.name,
 				type: pvc.type,
 				size: pvc.size,
@@ -219,6 +222,7 @@ module.exports = {
 			
 			const claim = await ctx.call('v1.namespaces.pvcs.deleteNamespacedPVC', {
 				namespace: pvc.namespace,
+				cluster: pvc.cluster,
 				name: pvc.name
 			})
 			this.logger.info(`PVC deleted ${claim.metadata.name}`, claim.status);
