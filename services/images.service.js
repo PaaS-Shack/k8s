@@ -353,7 +353,7 @@ module.exports = {
 						}
 					],
 					volumes: [{
-						type: 'ssd',
+						type: 'local',
 						local: '/var/www/html'
 					}]
 				}
@@ -381,7 +381,7 @@ module.exports = {
 
 					],
 					volumes: [{
-						type: 'ssd',
+						type: 'replica',
 						local: '/var/lib/registry'
 					}]
 				}
@@ -438,7 +438,7 @@ module.exports = {
 						}
 					],
 					volumes: [{
-						type: 'ssd',
+						type: 'local',
 						local: '/bitnami'
 					}]
 				}
@@ -487,7 +487,7 @@ module.exports = {
 						Cmd: ['server', '--console-address', ':9001', '/data']
 					},
 					volumes: [{
-						type: 'ssd',
+						type: 'local',
 						local: '/data'
 					}]
 				}
@@ -537,7 +537,7 @@ module.exports = {
 						type: 'map'
 					}],
 					volumes: [{
-						type: 'ssd',
+						type: 'replica',
 						local: '/data'
 					}]
 				}
@@ -562,11 +562,42 @@ module.exports = {
 					links: [],
 					envs: [],
 					volumes: [{
-						type: 'remote',
-						local: '/mnt/remote'
+						type: 'replica',
+						local: '/mnt/replica'
 					}, {
-						type: 'ssd',
+						type: 'local',
 						local: '/mnt/local'
+					}, {
+						type: 'network',
+						local: '/mnt/network'
+					}]
+				}
+
+				const vscode = {
+					name: 'vscode-server',
+					imageName: 'vcode',
+					namespace: 'flybytim',
+					tag: '0.0.1',
+					registry: 'docker.io',
+					remote: {
+
+					},
+					dockerFile: '/Dockerfile',
+					source: "frontend",
+					process: "web",
+					size: 'S10',
+					ports: [{
+						internal: 8443,
+						type: 'http',
+					}],
+					links: [],
+					envs: [],
+					volumes: [{
+						type: 'local',
+						local: '/mnt/workspace'
+					}, {
+						type: 'replica',
+						local: '/config'
 					}]
 				}
 
@@ -590,7 +621,7 @@ module.exports = {
 					links: [],
 					envs: [],
 					volumes: [{
-						type: 'remote',
+						type: 'replica',
 						local: '/app/data'
 					}]
 				}
@@ -634,7 +665,7 @@ module.exports = {
 						}
 					],
 					volumes: [{
-						type: 'ssd',
+						type: 'local',
 						local: '/var/www/html'
 					}]
 				}
@@ -657,31 +688,28 @@ module.exports = {
 						internal: 3306,
 						type: 'tcp',
 					}],
-					envs: [
-						{
-							key: 'MYSQL_ROOT_PASSWORD',
-							type: 'secret'
-						}
-					],
-					volumes: [
-						{
-							local: '/var/lib/mysql',
-							type: 'ssd'
-						}
-					]
+					envs: [{
+						key: 'MYSQL_ROOT_PASSWORD',
+						type: 'secret'
+					}],
+					volumes: [{
+						local: '/var/lib/mysql',
+						type: 'replica'
+					}]
 				}
 
 
 				let imageConfig = [
-					wordpress,
-					registry,
-					matomo,
-					minio,
-					gitea,
-					devNodeJS,
-					uptimekuma,
-					nextcloud,
-					//mysql,
+					// wordpress,
+					// registry,
+					// matomo,
+					// minio,
+					// gitea,
+					// devNodeJS,
+					// uptimekuma,
+					// nextcloud,
+					// mysql,
+					vscode,
 				]
 				let results = []
 				for (let index = 0; index < imageConfig.length; index++) {

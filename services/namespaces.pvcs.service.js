@@ -58,7 +58,7 @@ module.exports = {
 			},
 			type: {
 				type: "enum",
-				values: ["local", "remote"],
+				values: ["local", "replica", "network"],
 				required: true,
 			},
 
@@ -134,71 +134,84 @@ module.exports = {
 			}
 		},
 		deleteNamespacedPVC: {
-            rest: "DELETE /namespaces/:namespace/pvc/:name",
-            params: {
-                namespace: { type: "string", optional: false },
-                name: { type: "string", optional: false },
-                cluster: { type: "string", optional: false },
-            },
-            async handler(ctx) {
-                const params = Object.assign({}, ctx.params);
-                const results = []
-                const claimName = `${params.name}-pv-claim`
+			rest: "DELETE /namespaces/:namespace/pvc/:name",
+			params: {
+				namespace: { type: "string", optional: false },
+				name: { type: "string", optional: false },
+				cluster: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+				const results = []
+				const claimName = `${params.name}-pv-claim`
 
-                return ctx.call('v1.kube.deleteNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, name: claimName })
-            }
-        },
-        readNamespacedPVC: {
-            rest: "GET /namespaces/:namespace/pvc/:name",
-            params: {
-                namespace: { type: "string", optional: false },
-                name: { type: "string", optional: false },
-                cluster: { type: "string", optional: false },
-            },
-            async handler(ctx) {
-                const params = Object.assign({}, ctx.params);
-                const results = []
-                const claimName = `${params.name}-pv-claim`;
+				return ctx.call('v1.kube.deleteNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, name: claimName })
+			}
+		},
+		readNamespacedPVC: {
+			rest: "GET /namespaces/:namespace/pvc/:name",
+			params: {
+				namespace: { type: "string", optional: false },
+				name: { type: "string", optional: false },
+				cluster: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+				const results = []
+				const claimName = `${params.name}-pv-claim`;
 
-                return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, name: claimName })
-            }
-        },
-        createNamespacedPVC: {
-            rest: "POST /namespaces/:namespace/pvc",
-            params: {
-                namespace: { type: "string", optional: false },
-                name: { type: "string", optional: false },
-                cluster: { type: "string", optional: false },
-                type: { type: "enum", values: ['local', 'remote'], default: 'remote', optional: true },
-                size: { type: "number", default: 1000, optional: true },
-            },
-            async handler(ctx) {
-                const params = Object.assign({}, ctx.params);
-                const results = []
-                const claimName = `${params.name}-pv-claim`
+				return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, name: claimName })
+			}
+		},
+		createNamespacedPVC: {
+			rest: "POST /namespaces/:namespace/pvc",
+			params: {
+				namespace: { type: "string", optional: false },
+				name: { type: "string", optional: false },
+				cluster: { type: "string", optional: false },
+				type: { type: "enum", values: ["local", "replica", "network"], default: 'replica', optional: true },
+				size: { type: "number", default: 1000, optional: true },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+				const results = []
+				const claimName = `${params.name}-pv-claim`
 
-                let storageClassName = 'longhorn';
+				let storageClassName = '';
 
-                const PersistentVolumeClaim = {
-                    apiVersion: "v1",
-                    kind: "PersistentVolumeClaim",
-                    metadata: {
-                        name: claimName
-                    },
-                    spec: {
-                        storageClassName,
-                        accessModes: ["ReadWriteMany"],
-                        resources: {
-                            requests: {
-                                storage: `${params.size}Mi`
-                            }
-                        }
-                    }
-                }
+				switch (params.type) {
+					case 'local':
+						storageClassName = 'local-path'
+						break;
+					case 'network':
+						storageClassName = 'nfs-client'
+						break;
+					case 'replica':
+					default:
+						storageClassName = 'longhorn'
+						break;
+				}
 
-                return ctx.call('v1.kube.createNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, body: PersistentVolumeClaim })
-            }
-        },
+				const PersistentVolumeClaim = {
+					apiVersion: "v1",
+					kind: "PersistentVolumeClaim",
+					metadata: {
+						name: claimName
+					},
+					spec: {
+						storageClassName,
+						accessModes: ["ReadWriteOnce"],
+						resources: {
+							requests: {
+								storage: `${params.size}Mi`
+							}
+						}
+					}
+				}
+
+				return ctx.call('v1.kube.createNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, body: PersistentVolumeClaim })
+			}
+		},
 	},
 
 	/**
@@ -207,7 +220,7 @@ module.exports = {
 	events: {
 		async "namespaces.pvcs.created"(ctx) {
 			const pvc = ctx.params.data;
-			
+
 			const claim = await ctx.call('v1.namespaces.pvcs.createNamespacedPVC', {
 				namespace: pvc.namespace,
 				cluster: pvc.cluster,
@@ -219,7 +232,7 @@ module.exports = {
 		},
 		async "namespaces.pvcs.removed"(ctx) {
 			const pvc = ctx.params.data;
-			
+
 			const claim = await ctx.call('v1.namespaces.pvcs.deleteNamespacedPVC', {
 				namespace: pvc.namespace,
 				cluster: pvc.cluster,

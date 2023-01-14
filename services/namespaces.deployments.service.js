@@ -629,8 +629,8 @@ module.exports = {
 					"imagePullPolicy": deployment.image.pullPolicy,
 					"resources": {
 						"requests": {
-							"memory": `${deployment.size.memory}Mi`,
-							"cpu": `${deployment.size.cpu}m`
+							"memory": `${(deployment.size.memory / 10).toFixed(2)}Mi`,
+							"cpu": `${(deployment.size.cpu / 10).toFixed(2)}m`
 						},
 						"limits": {
 							"memory": `${deployment.size.memory}Mi`,
@@ -800,7 +800,7 @@ module.exports = {
 					cluster: namespace.cluster,
 					name,
 					mountPath: element.local,
-					type: element.type == 'ssd' ? 'local' : 'remote',
+					type: element.type,
 					size: 1000,
 				})
 
@@ -810,7 +810,7 @@ module.exports = {
 			const servicePorts = image.ports.filter((p) => p.type == 'tcp' || p.type == 'udp')
 
 			if (servicePorts.length) {
-				
+
 				const ingress = await ctx.call('v1.ingress.resolve', {
 					id: deployment.ingress,
 					fields: ['ipv4']
