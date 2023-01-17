@@ -697,7 +697,111 @@ module.exports = {
 						type: 'replica'
 					}]
 				}
-
+				const microweber = {
+					name: 'microweber',
+					imageName: 'microweber',
+					namespace: 'microweber',
+					tag: '1.4',
+					registry: 'docker.io',
+					remote: {
+						path: 'https://github.com/docker/distribution-library-image.git',
+						branch: 'master',
+						commit: '0be0d08b29d56bb1ef0fab93c751ca92d6976a19',
+					},
+					dockerFile: '/Dockerfile',
+					source: "frontend",
+					process: "web",
+					size: 'S3',
+					ports: [{
+						internal: 80,
+						type: 'http',
+					}],
+					links: [],
+					envs: [
+						{
+							key: 'mysql',
+							value: 'JGwP7rbJ4KtdZ1gEANrQ',
+							type: 'provision'
+						}, {
+							key: 'MATOMO_DATABASE_NAME',
+							value: 'MYSQL_DATABASE',
+							type: 'map'
+						}, {
+							key: 'MYSQL_USER',
+							value: 'MYSQL_USERNAME',
+							type: 'map'
+						}, {
+							key: 'APP_URL',
+							value: 'https://${VHOST}/',
+							type: 'route'
+						}
+					],
+					volumes: []
+				}
+				const prestashop = {
+					name: 'prestashop',
+					imageName: 'prestashop',
+					namespace: 'prestashop',
+					tag: 'latest',
+					registry: 'docker.io',
+					remote: {
+						path: 'https://github.com/docker/distribution-library-image.git',
+						branch: 'master',
+						commit: '0be0d08b29d56bb1ef0fab93c751ca92d6976a19',
+					},
+					dockerFile: '/Dockerfile',
+					source: "frontend",
+					process: "web",
+					size: 'S3',
+					ports: [{
+						internal: 80,
+						type: 'http',
+					}],
+					links: [],
+					envs: [
+						{
+							key: 'mysql',
+							value: 'JGwP7rbJ4KtdZ1gEANrQ',
+							type: 'provision'
+						}, {
+							key: 'DB_SERVER',
+							value: 'MYSQL_HOST,MYSQL_PORT',
+							type: 'map'
+						}, {
+							key: 'DB_NAME',
+							value: 'MYSQL_DATABASE',
+							type: 'map'
+						},  {
+							key: 'DB_USER',
+							value: 'MYSQL_USERNAME',
+							type: 'map'
+						},  {
+							key: 'DB_PASSWD',
+							value: 'MYSQL_PASSWORD',
+							type: 'map'
+						}, {
+							key: 'PS_DOMAIN',
+							value: 'https://${VHOST}/',
+							type: 'route'
+						},{
+							key:'PS_INSTALL_AUTO',
+							value:'1'
+						},{
+							key:'PS_INSTALL_DB',
+							value:'1'
+						},{
+							key:'PS_FOLDER_INSTALL',
+							value:'install_renamed'
+						},{
+							key:'PS_FOLDER_ADMIN',
+							value:'admin_ps'
+						}
+					],
+					volumes: [{
+						type:'replica',
+						local:'/var/www/html'
+					}]
+				}
 
 				let imageConfig = [
 					// wordpress,
@@ -709,7 +813,9 @@ module.exports = {
 					// uptimekuma,
 					// nextcloud,
 					// mysql,
-					vscode,
+					//vscode,
+					//microweber,
+					prestashop,
 				]
 				let results = []
 				for (let index = 0; index < imageConfig.length; index++) {

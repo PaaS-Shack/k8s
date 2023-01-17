@@ -329,6 +329,17 @@ module.exports = {
 		async "envs.removed"(ctx) {
 			const env = ctx.params.data;
 			await this.patchConfigMap(ctx, env);
+			if (env.type == 'provision') {
+
+				const callCMD = `v1.${env.key}.deprovision`
+
+				this.logger.info(`Packing provisioned ENV ${env.key} for ${params.reference} at ${callCMD}`)
+
+				const entity = await ctx.call(callCMD, {
+					id: env.value
+				})
+
+			}
 		},
 		async "envs.created"(ctx) {
 			const env = ctx.params.data;
@@ -408,13 +419,6 @@ module.exports = {
 				cluster: namespace.cluster,
 				name: deployment.name,
 				body: configMap
-			}).catch(() => {
-				return ctx.call('v1.kube.createNamespacedConfigMap', {
-					namespace: namespace.name,
-					cluster: namespace.cluster,
-					name: deployment.name,
-					body: configMap
-				})
 			})
 
 		}
