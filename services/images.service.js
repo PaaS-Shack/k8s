@@ -584,14 +584,30 @@ module.exports = {
 					},
 					dockerFile: '/Dockerfile',
 					source: "frontend",
-					process: "web",
+					process: "code-server",
 					size: 'S10',
 					ports: [{
 						internal: 8443,
 						type: 'http',
+					}, {
+						internal: 8444,
+						subdomain: 'dev-8444',
+						type: 'http',
+					}, {
+						internal: 8445,
+						subdomain: 'dev-8445',
+						type: 'http',
 					}],
 					links: [],
-					envs: [],
+					envs: [{
+						key: 'PASSWORD',
+						type: 'secret',
+						scope: 'RUN_TIME'
+					}, {
+						key: 'SUDO_PASSWORD',
+						type: 'secret',
+						scope: 'RUN_TIME'
+					}],
 					volumes: [{
 						type: 'local',
 						local: '/mnt/workspace'
@@ -771,11 +787,11 @@ module.exports = {
 							key: 'DB_NAME',
 							value: 'MYSQL_DATABASE',
 							type: 'map'
-						},  {
+						}, {
 							key: 'DB_USER',
 							value: 'MYSQL_USERNAME',
 							type: 'map'
-						},  {
+						}, {
 							key: 'DB_PASSWD',
 							value: 'MYSQL_PASSWORD',
 							type: 'map'
@@ -783,23 +799,23 @@ module.exports = {
 							key: 'PS_DOMAIN',
 							value: 'https://${VHOST}/',
 							type: 'route'
-						},{
-							key:'PS_INSTALL_AUTO',
-							value:'1'
-						},{
-							key:'PS_INSTALL_DB',
-							value:'1'
-						},{
-							key:'PS_FOLDER_INSTALL',
-							value:'install_renamed'
-						},{
-							key:'PS_FOLDER_ADMIN',
-							value:'admin_ps'
+						}, {
+							key: 'PS_INSTALL_AUTO',
+							value: '1'
+						}, {
+							key: 'PS_INSTALL_DB',
+							value: '1'
+						}, {
+							key: 'PS_FOLDER_INSTALL',
+							value: 'install_renamed'
+						}, {
+							key: 'PS_FOLDER_ADMIN',
+							value: 'admin_ps'
 						}
 					],
 					volumes: [{
-						type:'replica',
-						local:'/var/www/html'
+						type: 'replica',
+						local: '/var/www/html'
 					}]
 				}
 

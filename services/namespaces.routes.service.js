@@ -1,7 +1,6 @@
 "use strict";
 
 const DbService = require("db-mixin");
-const Cron = require("cron-mixin");
 const Membership = require("membership-mixin");
 
 const Lock = require('../lib/lock')
@@ -17,7 +16,6 @@ module.exports = {
 
 	mixins: [
 		DbService({}),
-		Cron,
 		Membership({
 			permissions: 'namespaces.routes'
 		})
@@ -85,6 +83,18 @@ module.exports = {
 					}
 				},
 			},
+			hosts: {
+				type: 'array',
+				items: "string",
+				optional: true,
+				default: [],
+				populate: {
+					action: "v1.routes.hosts.resolve",
+					params: {
+						fields: ["id", "vHost", "strategy"]
+					}
+				}
+			},
 
 			options: { type: "object" },
 			createdAt: {
@@ -115,15 +125,6 @@ module.exports = {
 		defaultScopes: ["notDeleted", ...Membership.DSCOPE]
 	},
 
-	crons: [
-		{
-			name: "Starting all services",
-			cronTime: "*/30 * * * *",
-			onTick: {
-				//action: "v1.services.startAll"
-			}
-		}
-	],
 	/**
 	 * Actions
 	 */
@@ -281,7 +282,7 @@ module.exports = {
 				const port = routePorts[index];
 				const containerPort = container.ports.find((pp) => pp.port == port.internal)
 				for (let i = 0; i < routes.length; i++) {
-					const { route, vHost } = routes[i];
+					const { route, vHost, id } = routes[i];
 					const query = {
 						hostname: containerPort.hostname,
 						port: containerPort.port,
@@ -298,6 +299,12 @@ module.exports = {
 										route,
 										id: host.id
 									}, options)
+										.then((hostID) => this.updateEntity(ctx, {
+											id: route,
+											$pull: {
+												hosts: hostID
+											},
+										}, { raw: true }))
 								}
 								return host
 							}))
@@ -305,6 +312,12 @@ module.exports = {
 						promises.push(ctx.call('v1.routes.hosts.resolveHost', query, options)
 							.then((found) => found ? found :
 								ctx.call('v1.routes.hosts.create', query, options)
+									.then((host) => this.updateEntity(ctx, {
+										id: route,
+										$addToSet: {
+											hosts: host.id
+										},
+									}, { raw: true }))
 							))
 					}
 				}
