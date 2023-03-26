@@ -283,7 +283,7 @@ module.exports = {
 			const data = this.formatEvent(event)
 
 			const namesapce = await ctx.call('v1.namespaces.resolveName', { name: data.namespace })
-			const options = { meta: { userID: 'mN7zNRpMY0hMPPp4g68l' } }
+			const options = { meta: { userID: 'EdvY0DeOLgiZgX4Mgv0a' } }
 			if (namesapce) {
 				options.meta.userID = namesapce.owner;
 			}
