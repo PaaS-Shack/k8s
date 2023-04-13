@@ -629,8 +629,8 @@ module.exports = {
 					"imagePullPolicy": deployment.image.pullPolicy,
 					"resources": {
 						"requests": {
-							"memory": `${(deployment.size.memory / 10).toFixed(2)}Mi`,
-							"cpu": `${(deployment.size.cpu / 10).toFixed(2)}m`
+							"memory": `${(deployment.size.memory / 2).toFixed(2)}Mi`,
+							"cpu": `${(deployment.size.cpu / 2).toFixed(2)}m`
 						},
 						"limits": {
 							"memory": `${deployment.size.memory}Mi`,
@@ -917,13 +917,21 @@ module.exports = {
 
 
 			for (let index = 0; index < image.volumes.length; index++) {
-				const element = image.volumes[index];
 				const name = `${deployment.name}-${index}`;
-				await ctx.call('v1.namespaces.pvcs.deleteNamespacedPVC', {
-					namespace: namespace.name,
-					cluster: namespace.cluster,
-					name
+
+				const pvcs = await ctx.call('v1.namespaces.pvcs.find', {
+					query: {
+						namespace: namespace.name,
+						name
+					}
 				})
+
+				for (let index = 0; index < pvcs.length; index++) {
+					const pvc = pvcs[index];
+					await ctx.call('v1.namespaces.pvcs.remove', {
+						id: pvc.id
+					})
+				}
 
 				this.logger.info(`Deployment(${deployment.id}) PVC removed ${name}`);
 			}
