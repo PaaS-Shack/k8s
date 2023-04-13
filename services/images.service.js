@@ -111,6 +111,7 @@ module.exports = {
 					}
 				},
 				onCreate: ({ ctx }) => ctx.call('v1.sizes.getSize', { name: ctx.params.size }).then((res) => res.id),
+				onUpdate: ({ ctx }) => ctx.call('v1.sizes.getSize', { name: ctx.params.size }).then((res) => res.id),
 				validate: "validateSize"
 			},
 
@@ -301,7 +302,7 @@ module.exports = {
 			}
 		},
 
-		test: {
+		seedDB: {
 			cache: false,
 			params: {
 
@@ -575,10 +576,10 @@ module.exports = {
 
 				const vscode = {
 					name: 'vscode-server',
-					imageName: 'vcode',
-					namespace: 'flybytim',
-					tag: '0.0.1',
-					registry: 'docker.io',
+					imageName: 'docker-code-server',
+					namespace: 'paas-shack',
+					tag: 'master',
+					registry: 'ghcr.io',
 					remote: {
 
 					},
@@ -587,14 +588,14 @@ module.exports = {
 					process: "code-server",
 					size: 'S10',
 					ports: [{
-						internal: 8443,
+						internal: 8080,
 						type: 'http',
 					}, {
-						internal: 8444,
+						internal: 8081,
 						subdomain: 'dev-8444',
 						type: 'http',
 					}, {
-						internal: 8445,
+						internal: 8082,
 						subdomain: 'dev-8445',
 						type: 'http',
 					}],
@@ -820,26 +821,52 @@ module.exports = {
 				}
 
 				let imageConfig = [
-					// wordpress,
-					// registry,
-					// matomo,
-					// minio,
-					// gitea,
-					// devNodeJS,
-					// uptimekuma,
-					// nextcloud,
-					// mysql,
-					//vscode,
-					//microweber,
+					wordpress,
+					registry,
+					matomo,
+					minio,
+					gitea,
+					devNodeJS,
+					uptimekuma,
+					nextcloud,
+					mysql,
+					vscode,
+					microweber,
 					prestashop,
 				]
 				let results = []
 				for (let index = 0; index < imageConfig.length; index++) {
-					results.push(await ctx.call('v1.images.create', imageConfig[index]).catch((err) => {
-						console.log(err)
+					const schema = imageConfig[index]
 
-						return err
-					}))
+					const found = await ctx.call('v1.images.find', {
+						query: {
+							name: schema.name
+						}
+					}).then((res) => res.shift())
+
+					if (found) {
+
+
+
+
+
+						results.push(await ctx.call('v1.images.update', {
+							...imageConfig[index],
+							id: found.id
+						}).catch((err) => {
+							console.log(err)
+
+							return err
+						}))
+					} else {
+						results.push(await ctx.call('v1.images.create', imageConfig[index]).catch((err) => {
+							console.log(err)
+
+							return err
+						}))
+					}
+
+
 				}
 				return results;
 			}
