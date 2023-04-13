@@ -130,6 +130,55 @@ module.exports = {
 	 */
 
 	actions: {
+		stats: {
+			params: {
+				namespace: { type: "string", optional: false },
+				deployment: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+				const routes = await this.findEntities(ctx, {
+					query: {
+						deployment: params.deployment,
+						namespace: params.namespace
+					}
+				})
+				const statsObjects = await ctx.call('v1.routes.stats').then((res) => res.map(({ info }) => info))
+
+				const keys = ['hits', 'hitsTotal', 'missesTotal', 'misses', 'latencyAvg']
+
+				const stats = {}
+				for (let i = 0; i < routes.length; i++) {
+					const route = routes[i];
+
+					const obj = {}
+					for (let index = 0; index < keys.length; index++) {
+						const key = keys[index];
+						obj[key] = 0
+					}
+
+					stats[route.vHost] = obj
+				}
+
+
+				for (let index = 0; index < statsObjects.length; index++) {
+					const statsObject = statsObjects[index];
+
+					for (let i = 0; i < routes.length; i++) {
+						const route = routes[i];
+						if (statsObject.routes && statsObject.routes[route.vHost]) {
+							for (let j = 0; j < keys.length; j++) {
+								const key = keys[j];
+								if (typeof statsObject.routes[route.vHost][key] == 'number')
+									stats[route.vHost][key] += statsObject.routes[route.vHost][key]
+							}
+						}
+					}
+				}
+
+				return stats
+			}
+		},
 		resolveOrCreate: {
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
@@ -182,35 +231,23 @@ module.exports = {
 
 			const options = { meta: { userID: deployment.owner } };
 
+			const image = await ctx.call('v1.images.resolve', { id: deployment.image, fields: ['ports'] })
+
 			const routes = []
 
 			for (let index = 0; index < deployment.vHosts.length; index++) {
 				const vHost = deployment.vHosts[index];
 
-				const found = await ctx.call('v1.routes.resolveRoute', {
-					vHost
-				}, options);
-
-				if (found) {
-					const entity = await ctx.call('v1.namespaces.routes.create', {
-						vHost,
-						route: found.id,
-						deployment: deployment.id,
-						namespace: deployment.namespace
-					}, options)
-					this.logger.info(`Add found route ${found.id} id ${entity.id} on deployment ${deployment.id}`)
-				} else {
-					const route = await ctx.call('v1.routes.create', {
-						vHost
-					}, options);
-					const entity = await ctx.call('v1.namespaces.routes.create', {
-						vHost,
-						route: route.id,
-						deployment: deployment.id,
-						namespace: deployment.namespace
-					}, options)
-					this.logger.info(`Add new route ${route.id} id ${entity.id} on deployment ${deployment.id}`)
+				const routePorts = image.ports.filter((p) => p.type == 'http' || p.type == 'https')
+				for (let index = 0; index < routePorts.length; index++) {
+					const { subdomain } = routePorts[index];
+					if (subdomain) {
+						await this.createOrUpdateRoute({ vHost: `${subdomain}.${vHost}`, deployment, options, ctx })
+					} else {
+						await this.createOrUpdateRoute({ vHost: `${vHost}`, deployment, options, ctx })
+					}
 				}
+
 			}
 
 		},
@@ -255,6 +292,73 @@ module.exports = {
 	 * Methods
 	 */
 	methods: {
+		async createOrUpdateRoute({ vHost, deployment, options, ctx }) {
+			const found = await ctx.call('v1.routes.resolveRoute', {
+				vHost
+			}, options);
+
+			if (found) {
+				const entity = await ctx.call('v1.namespaces.routes.create', {
+					vHost,
+					route: found.id,
+					deployment: deployment.id,
+					namespace: deployment.namespace
+				}, options)
+				this.logger.info(`Add found route ${found.id} id ${entity.id} on deployment ${deployment.id}`)
+			} else {
+				const route = await ctx.call('v1.routes.create', {
+					vHost
+				}, options);
+				const entity = await ctx.call('v1.namespaces.routes.create', {
+					vHost,
+					route: route.id,
+					deployment: deployment.id,
+					namespace: deployment.namespace
+				}, options)
+				this.logger.info(`Add new route ${route.id} id ${entity.id} on deployment ${deployment.id}`)
+			}
+		},
+		async createOrUpdateHost({ state, containerPort, namespace, route, id, options, ctx }) {
+			const query = {
+				hostname: containerPort.hostname,
+				port: containerPort.port,
+				cluster: namespace.cluster,
+				route: route
+			}
+			const promises = []
+
+			if (state == 'terminated') {
+
+				promises.push(ctx.call('v1.routes.hosts.resolveHost', query, options)
+					.then((host) => {
+						if (host) {
+							return ctx.call('v1.routes.hosts.remove', {
+								route,
+								id: host.id
+							}, options)
+								.then((hostID) => this.updateEntity(ctx, {
+									id,
+									$pull: {
+										hosts: hostID
+									},
+								}, { raw: true }))
+						}
+						return host
+					}))
+			} else if (state == 'running') {
+				promises.push(ctx.call('v1.routes.hosts.resolveHost', query, options)
+					.then((found) => found ? found :
+						ctx.call('v1.routes.hosts.create', query, options)
+							.then((host) => this.updateEntity(ctx, {
+								id,
+								$addToSet: {
+									hosts: host.id
+								},
+							}, { raw: true }))
+					))
+			}
+			return promises
+		},
 		async containerStateProcess(ctx, state, container) {
 
 			const promises = []
@@ -262,15 +366,21 @@ module.exports = {
 
 			const namespace = await ctx.call('v1.namespaces.resolve', {
 				id: container.annotations['k8s.one-host.ca/namespace'],
-				fields: ['cluster']
+				fields: ['cluster', 'id']
+			}, options)
+			const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
+				id: container.annotations['k8s.one-host.ca/deployment'],
+				namespace: namespace.id,
+				fields: ['vHosts', 'id'],
+				scope: '-notDeleted'
 			}, options)
 			const image = await ctx.call('v1.images.resolve', {
 				id: container.annotations['k8s.one-host.ca/image']
 			}, options)
 			const routes = await ctx.call('v1.namespaces.routes.find', {
 				query: {
-					namespace: container.annotations['k8s.one-host.ca/namespace'],
-					deployment: container.annotations['k8s.one-host.ca/deployment'],
+					namespace: namespace.id,
+					deployment: deployment.id,
 				}
 			}, options)
 
@@ -278,51 +388,23 @@ module.exports = {
 
 			const routePorts = image.ports.filter((p) => p.type == 'http' || p.type == 'https')
 
-			for (let index = 0; index < routePorts.length; index++) {
-				const port = routePorts[index];
-				const containerPort = container.ports.find((pp) => pp.port == port.internal)
-				for (let i = 0; i < routes.length; i++) {
-					const { route, vHost, id } = routes[i];
-					const query = {
-						hostname: containerPort.hostname,
-						port: containerPort.port,
-						cluster: namespace.cluster,
-						route: route
-					}
 
+			for (let index = 0; index < deployment.vHosts.length; index++) {
+				const vHost = deployment.vHosts[index];
 
-					if (state == 'terminated') {
-						promises.push(ctx.call('v1.routes.hosts.resolveHost', query, options)
-							.then((host) => {
-								if (host) {
-									return ctx.call('v1.routes.hosts.remove', {
-										route,
-										id: host.id
-									}, options)
-										.then((hostID) => this.updateEntity(ctx, {
-											id: route,
-											$pull: {
-												hosts: hostID
-											},
-										}, { raw: true }))
-								}
-								return host
-							}))
-					} else if (state == 'running') {
-						promises.push(ctx.call('v1.routes.hosts.resolveHost', query, options)
-							.then((found) => found ? found :
-								ctx.call('v1.routes.hosts.create', query, options)
-									.then((host) => this.updateEntity(ctx, {
-										id: route,
-										$addToSet: {
-											hosts: host.id
-										},
-									}, { raw: true }))
-							))
-					}
+				for (let index = 0; index < routePorts.length; index++) {
+					const { subdomain, internal } = routePorts[index];
+
+					const containerPort = container.ports.find((pp) => pp.port == internal)
+
+					const route = routes.find((route) => {
+						return route.vHost == (subdomain != undefined ? `${subdomain}.${vHost}` : `${vHost}`)
+					})
+					if (route)
+						promises.push(...(await this.createOrUpdateHost({ state, containerPort, namespace, route: route.route, id: route.id, options, ctx })))
 				}
-			}
 
+			}
 
 
 			const result = await Promise.allSettled(promises)
