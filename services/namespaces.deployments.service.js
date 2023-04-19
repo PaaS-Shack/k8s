@@ -5,6 +5,7 @@ const Cron = require("cron-mixin");
 const Membership = require("membership-mixin");
 
 const { MoleculerClientError } = require("moleculer").Errors;
+const { PrometheusDriver } = require('prometheus-query')
 
 /**
  * attachments of addons service
@@ -137,6 +138,7 @@ module.exports = {
 				type: 'array',
 				items: "string",
 				optional: true,
+				default: [],
 				populate: {
 					action: "v1.routes.resolve",
 					params: {
@@ -146,13 +148,17 @@ module.exports = {
 			},
 			routes: {
 				type: 'array',
-				items: "string",
-				optional: true,
-				populate: {
-					action: "v1.routes.resolve",
-					params: {
-						fields: ["id", "vHost", "strategy"]
-					}
+				virtual: true,
+				populate(ctx = this.broker, values, entities, field) {
+					if (!ctx) return null
+					return Promise.all(
+						entities.map(async entity => {
+							console.log({ query: { namespace: entity.namespace, deployment: entity.id } })
+							return ctx.call('v1.namespaces.routes.find', {
+								query: { namespace: entity.namespace, deployment: this.encodeID(entity._id), },
+							})
+						})
+					);
 				}
 			},
 			ingress: {
@@ -404,6 +410,92 @@ module.exports = {
 			needEntity: true,
 			permissions: ['namespaces.deployments.remove']
 		},
+		metrics: {
+			rest: "GET /:id/metrics",
+			permissions: ['namespaces.deployments.remove'],
+			params: {
+				id: { type: "string" },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, {
+					id: params.id
+				});
+				if (!deployment) {
+					throw new MoleculerClientError("deployment not found.", 400, "ERR_EMAIL_EXISTS");
+				}
+
+				const dply = await ctx.call('v1.kube.findOne', {
+					_id: deployment.uid
+				})
+				if (!dply || !dply.metadata) {
+					return null;
+				}
+				const pod = await ctx.call('v1.kube.findOne', {
+					kind: 'Pod',
+					'metadata.labels.app': dply.metadata.labels.app,
+					fields: ['metadata.name']
+				})
+				if (!pod || !pod.metadata) {
+					return null;
+				}
+
+				const bytesToMB = async (res) => res.result[0] ? (res.result[0].value.value / 1024 / 1024).toFixed(2) : 0
+				const q = `sum(container_network_transmit_bytes_total{ pod="${pod.metadata.name}" }) by (pod)`;
+				const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+				const end = new Date();
+				const step =  15 * 60; // 1 point every 6 hours
+				const [
+					transmit_bytes_total, receive_bytes_total,
+					pod_cpu,
+					pod_requests_cpu, pod_limits_cpu,
+			
+					pod_memory,
+					pod_requests_memory, pod_limits_memory,
+			
+			
+			
+				] = await Promise.all([
+					this.prom.rangeQuery(
+						`sum(irate(container_network_transmit_bytes_total{pod="${pod.metadata.name}"}[15m])) by (pod)`, start, end, step
+					).then((res)=>res.result.shift()?.values),
+					this.prom.rangeQuery(
+						`sum(irate(container_network_receive_bytes_total{pod="${pod.metadata.name}"}[15m])) by (pod)`, start, end, step
+					).then((res)=>res.result.shift()?.values),
+					this.prom.rangeQuery(
+						`sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
+					).then((res)=>res.result.shift()?.values),
+					this.prom.rangeQuery(
+						`sum(cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
+					).then((res)=>res.result.shift()?.values),
+					this.prom.rangeQuery(
+						`sum(cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
+					).then((res)=>res.result.shift()?.values),
+			
+					this.prom.rangeQuery(
+						`sum(container_memory_working_set_bytes{ pod="${pod.metadata.name}" }) by (container)`, start, end, step
+					).then((res)=>res.result.shift()?.values),
+					this.prom.rangeQuery(
+						`sum(cluster:namespace:pod_memory:active:kube_pod_container_resource_requests{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
+					).then((res)=>res.result.shift()?.values),
+					this.prom.rangeQuery(
+						`sum(cluster:namespace:pod_memory:active:kube_pod_container_resource_limits{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
+					).then((res)=>res.result.shift()?.values)
+				])
+			
+			
+				return {
+					transmit_bytes_total, receive_bytes_total,
+					pod_cpu,
+					pod_requests_cpu, pod_limits_cpu,
+			
+					pod_memory,
+					pod_requests_memory, pod_limits_memory,
+				}
+				return this.prom.rangeQuery(q, start, end, step)
+			}
+		},
 		status: {
 			params: {
 				name: { type: "string", optional: false },
@@ -417,6 +509,8 @@ module.exports = {
 				if (!namespace) {
 					throw new MoleculerClientError("namespace not found.", 400, "ERR_EMAIL_EXISTS");
 				}
+
+
 
 				return namespace
 			}
@@ -651,6 +745,7 @@ module.exports = {
 						}
 					})
 				}
+
 				console.log(container)
 
 				if (deployment.image.config?.Cmd) {
@@ -710,7 +805,7 @@ module.exports = {
 						"requiredDuringSchedulingIgnoredDuringExecution": {
 							"nodeSelectorTerms": [{
 								"matchExpressions": [{
-									"key": "topology.kubernetes.io/zone",
+									"key": "topology.kubernetes.io/region",
 									"operator": "In",
 									"values": [deployment.zone]
 								}]
@@ -1042,7 +1137,11 @@ module.exports = {
 	/**
 	 * Service created lifecycle event handler
 	 */
-	created() { },
+	created() {
+		this.prom = new PrometheusDriver({
+			endpoint: "http://prom.admin.one-host.ca",
+		});
+	},
 
 	/**
 	 * Service started lifecycle event handler

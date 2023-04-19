@@ -32,7 +32,8 @@
     "membership-mixin": "git+https://github.com/FLYBYME/membership-mixin.git",
     "middlewares": "git+https://github.com/PaaS-Shack/middlewares.git",
     "moleculer": "^0.14.26",
-    "nats": "^2.7.1"
+    "nats": "^2.7.1",
+    "prometheus-query": "^3.3.1"
   },
   "engines": {
     "node": ">= 16.x.x"

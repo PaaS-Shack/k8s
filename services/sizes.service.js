@@ -119,6 +119,28 @@ module.exports = {
 	 */
 
 	actions: {
+
+		list: {
+			permissions: ['sizes.list'],
+		},
+		find: {
+			rest: "GET /find",
+			permissions: ['sizes.find'],
+		},
+		count: {
+			rest: "GET /count",
+			permissions: ['sizes.count'],
+		},
+		get: {
+			needEntity: true,
+			permissions: ['sizes.get']
+		},
+		update: {
+			needEntity: true,
+			permissions: ['sizes.update']
+		},
+		replace: false,
+
 		getSize: {
 			description: "Add members to the addon",
 			params: {

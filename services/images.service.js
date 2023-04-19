@@ -176,37 +176,37 @@ module.exports = {
 
 	actions: {
 		create: {
-			permissions: ['domains.records.create'],
+			permissions: ['images.create'],
 		},
 		list: {
-			permissions: ['domains.records.list'],
+			permissions: ['images.list'],
 		},
 
 		find: {
 			rest: "GET /find",
-			permissions: ['domains.records.find'],
+			permissions: ['images.find'],
 		},
 
 		count: {
 			rest: "GET /count",
-			permissions: ['domains.records.count'],
+			permissions: ['images.count'],
 		},
 
 		get: {
 			needEntity: true,
-			permissions: ['domains.records.get']
+			permissions: ['images.get']
 		},
 
 		update: {
 			needEntity: true,
-			permissions: ['domains.records.update']
+			permissions: ['images.update']
 		},
 
 		replace: false,
 
 		remove: {
 			needEntity: true,
-			permissions: ['domains.records.remove']
+			permissions: ['images.remove']
 		},
 
 		clean: {
