@@ -176,15 +176,18 @@ module.exports = {
 					}
 
 				} else if (params.type == 'route') {
-					const vHost = await ctx.call('v1.namespaces.routes.getENVvHost', {
-						index: params.index,
-						value: params.value,
-						key: params.key,
-						deployment: params.deployment,
-						namespace: params.namespace,
-					})
-					params.value = `${vHost}`
-					this.logger.info(`Generating route ENV ${params.key} for ${params.reference} ${params.value}`)
+
+					const deployment = await ctx.call('v1.namespaces.deployments.resolve', { id: params.deployment, fields: ['name', 'zone', 'vHosts', 'image'] })
+					const image = await ctx.call('v1.images.resolve', { id: deployment.image, fields: ['ports'] })
+					const vHost = deployment.vHosts[0];
+					const routePorts = image.ports.filter((p) => p.type == 'http' || p.type == 'https')
+					const { subdomain } = routePorts[params.index];
+					if (subdomain) {
+						params.value = `${params.value.replace('${VHOST}', `${subdomain}.${vHost}`)}`
+					} else {
+						params.value = `${params.value.replace('${VHOST}', `${vHost}`)}`
+					}
+					
 				}
 				return this.createEntity(ctx, params, { permissive: true });
 
@@ -281,6 +284,7 @@ module.exports = {
 					.forEach((env) => buildRunScope[env.key] = env.value);
 
 				const provisionScopeArray = [];
+				const routesScopeArray = [];
 
 				const provisions = found.filter((env) => env.type == 'provision')
 
@@ -296,6 +300,7 @@ module.exports = {
 					})
 					provisionScopeArray.push(entity)
 				}
+
 
 				const envs = Object.assign({ PACKED_AT: `${new Date()}` }, buildRunScope, requestedScope, ...provisionScopeArray)
 
@@ -333,7 +338,7 @@ module.exports = {
 
 				const callCMD = `v1.${env.key}.deprovision`
 
-				this.logger.info(`Packing provisioned ENV ${env.key} for ${params.reference} at ${callCMD}`)
+				this.logger.info(`Packing provisioned ENV ${env.key} for ${env.reference} at ${callCMD}`)
 
 				const entity = await ctx.call(callCMD, {
 					id: env.value

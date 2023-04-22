@@ -8,6 +8,8 @@ const ConfigLoader = require("config-mixin");
 
 const { MoleculerClientError } = require("moleculer").Errors;
 
+const fs = require('fs').promises;
+
 /**
  * attachments of addons service
  */
@@ -302,6 +304,57 @@ module.exports = {
 			}
 		},
 
+		loadImages: {
+			params: {
+
+			},
+			permissions: ['images.loadImages'],
+			async handler(ctx) {
+const results=[]
+
+				const dirname = './images';
+
+				const files = await fs.readdir(dirname)
+
+
+				for (let index = 0; index < files.length; index++) {
+					const filename = files[index];
+
+					const fileContent = await fs.readFile(`${dirname}/${filename}`, 'utf-8')
+
+
+					const schema = JSON.parse(fileContent)
+
+					const found = await ctx.call('v1.images.find', {
+						query: {
+							name: schema.name
+						}
+					}).then((res) => res.shift())
+
+					if (found) {
+
+						results.push(await ctx.call('v1.images.update', {
+							...schema,
+							id: found.id
+						}).catch((err) => {
+							console.log(err)
+
+							return err
+						}))
+					} else {
+						results.push(await ctx.call('v1.images.create', schema).catch((err) => {
+							console.log(err)
+
+							return err
+						}))
+					}
+					console.log(fileContent, JSON.parse(fileContent))
+				}
+
+				return results
+			}
+		},
+
 		seedDB: {
 			cache: false,
 			params: {
@@ -354,7 +407,7 @@ module.exports = {
 						}
 					],
 					volumes: [{
-						type: 'local',
+						type: 'default',
 						local: '/var/www/html'
 					}]
 				}
@@ -385,6 +438,35 @@ module.exports = {
 						type: 'replica',
 						local: '/var/lib/registry'
 					}]
+				}
+
+				const webssh = {
+					name: 'webssh',
+					imageName: 'webssh',
+					namespace: 'snsyzb',
+					tag: 'latest',
+					registry: '10.60.50.2:5000',
+					remote: {
+						path: 'https://github.com/huashengdun/webssh.git',
+						branch: 'master',
+						commit: '47cfeed020a31fe7882f6bfb0c9d66ff57241fd0',
+					},
+					dockerFile: '/Dockerfile',
+					source: "frontend",
+					process: "web",
+					size: 'S1',
+					config: {
+						Cmd: ["python", "run.py", "--address='0.0.0.0'", "--port=8888"]
+					},
+					ports: [{
+						internal: 8888,
+						type: 'http',
+					}],
+					links: [],
+					envs: [
+
+					],
+					volumes: []
 				}
 				const matomo = {
 					name: 'matomo',
@@ -439,7 +521,7 @@ module.exports = {
 						}
 					],
 					volumes: [{
-						type: 'local',
+						type: 'default',
 						local: '/bitnami'
 					}]
 				}
@@ -481,14 +563,14 @@ module.exports = {
 						key: 'MINIO_BROWSER_REDIRECT_URL',
 						type: 'route',
 						index: 1,
-						value: '${VHOST}',
+						value: 'https://${VHOST}',
 						scope: 'RUN_TIME'
 					}],
 					config: {
 						Cmd: ['server', '--console-address', ':9001', '/data']
 					},
 					volumes: [{
-						type: 'local',
+						type: 'default',
 						local: '/data'
 					}]
 				}
@@ -522,7 +604,7 @@ module.exports = {
 						value: 'mysql'
 					}, {
 						key: 'GITEA__database__HOST',
-						value: 'MYSQL_HOST',
+						value: 'MYSQL_HOST,MYSQL_PORT',
 						type: 'map'
 					}, {
 						key: 'GITEA__database__NAME',
@@ -556,6 +638,7 @@ module.exports = {
 					source: "frontend",
 					process: "web",
 					size: 'S10',
+					repo: true,
 					ports: [{
 						internal: 8080,
 						type: 'http',
@@ -569,8 +652,8 @@ module.exports = {
 						type: 'local',
 						local: '/mnt/local'
 					}, {
-						type: 'network',
-						local: '/mnt/network'
+						type: 'default',
+						local: '/mnt/default'
 					}]
 				}
 
@@ -610,7 +693,7 @@ module.exports = {
 						scope: 'RUN_TIME'
 					}],
 					volumes: [{
-						type: 'local',
+						type: 'default',
 						local: '/mnt/workspace'
 					}, {
 						type: 'replica',
@@ -682,7 +765,7 @@ module.exports = {
 						}
 					],
 					volumes: [{
-						type: 'local',
+						type: 'default',
 						local: '/var/www/html'
 					}]
 				}
@@ -833,6 +916,7 @@ module.exports = {
 					vscode,
 					microweber,
 					prestashop,
+					webssh,
 				]
 				let results = []
 				for (let index = 0; index < imageConfig.length; index++) {

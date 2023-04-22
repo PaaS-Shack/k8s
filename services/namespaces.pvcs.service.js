@@ -56,9 +56,14 @@ module.exports = {
 				type: "string",
 				required: true,
 			},
+			shared: {
+				type: "boolean",
+				required: false,
+				default: false
+			},
 			type: {
 				type: "enum",
-				values: ["local", "replica", "network"],
+				values: ["local", "replica", "default"],
 				required: true,
 			},
 
@@ -169,13 +174,14 @@ module.exports = {
 				namespace: { type: "string", optional: false },
 				name: { type: "string", optional: false },
 				cluster: { type: "string", optional: false },
-				type: { type: "enum", values: ["local", "replica", "network"], default: 'replica', optional: true },
+				shared: { type: "boolean", optional: true, default: false },
+				type: { type: "enum", values: ["local", "replica", "default"], default: 'replica', optional: true },
 				size: { type: "number", default: 1000, optional: true },
 			},
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
 				const results = []
-				const claimName = `${params.name}-pv-claim`
+				const claimName = `${params.name}-pv-claim${params.shared ? '-shared' : ''}`
 
 				let storageClassName = '';
 
@@ -183,12 +189,12 @@ module.exports = {
 					case 'local':
 						storageClassName = 'local-path'
 						break;
-					case 'network':
-						storageClassName = 'nfs-client'
+					case 'default':
+						storageClassName = 'longhorn'
 						break;
 					case 'replica':
 					default:
-						storageClassName = 'longhorn'
+						storageClassName = 'longhorn-replica'
 						break;
 				}
 
@@ -200,7 +206,7 @@ module.exports = {
 					},
 					spec: {
 						storageClassName,
-						accessModes: ["ReadWriteOnce"],
+						accessModes: [`ReadWrite${params.shared ? 'Many' : 'Once'}`],
 						resources: {
 							requests: {
 								storage: `${params.size}Mi`
@@ -226,6 +232,7 @@ module.exports = {
 				cluster: pvc.cluster,
 				name: pvc.name,
 				type: pvc.type,
+				shared: pvc.shared,
 				size: pvc.size,
 			})
 			this.logger.info(`PVC created ${claim.metadata.name}`, claim.status);

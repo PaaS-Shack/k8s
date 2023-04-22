@@ -1,0 +1,61 @@
+{
+    "name": "rutorrent",
+    "description": "",
+    "imageName": "rutorrent",
+    "namespace": "linuxserver",
+    "tag": "version-v3.10",
+    "registry": "ghcr.io",
+    "pullPolicy": "IfNotPresent",
+    "repo": false,
+    "remote": {
+        "path": "https://github.com/linuxserver/docker-rutorrent.git",
+        "branch": "master",
+        "commit": "78113ffc2069d63fb4e1e012d4c4d4dba665f05c"
+    },
+    "dockerFile": "/Dockerfile",
+    "source": "frontend",
+    "process": "web",
+    "size": "N2",
+    "config": {},
+    "ports": [
+        {
+            "internal": 80,
+            "type": "http",
+            "name": "frontend"
+        },
+        {
+            "internal": 51413,
+            "external": 51413,
+            "type": "tcp",
+            "name": "inbound"
+        }
+    ],
+    "links": [],
+    "envs": [
+        {
+            "type": "as",
+            "key": "PUID",
+            "value": "1000"
+        },
+        {
+            "type": "as",
+            "key": "PGID",
+            "value": "1000"
+        },
+        {
+            "type": "as",
+            "key": "TZ",
+            "value": "Europe/Amsterdam"
+        }
+    ],
+    "volumes": [
+        {
+            "type": "replica",
+            "local": "/config"
+        },
+        {
+            "type": "default",
+            "local": "/downloads"
+        }
+    ]
+}

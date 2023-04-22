@@ -202,14 +202,21 @@ module.exports = {
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
 
+
+				const routes = await this.findEntities(ctx, {
+					query: {
+						deployment: params.deployment,
+						namespace: params.namespace
+					}
+				})
 				const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
 					namespace: params.namespace,
 					id: params.deployment,
-					populate: ['routes', 'image']
+					populate: ['image']
 				})
 				const envSchema = deployment.image.envs.find((env) => env.key == params.key)
 
-				return `${envSchema.value.replace('${VHOST}', deployment.vHosts[params.index])}`
+				return `${envSchema.value.replace('${VHOST}', routes[params.index].vHost)}`
 			}
 		},
 	},

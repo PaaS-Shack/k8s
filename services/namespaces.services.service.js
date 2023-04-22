@@ -281,13 +281,20 @@ module.exports = {
 
 			for (let index = 0; index < service.ports.length; index++) {
 				const portSpec = service.ports[index];
-				serviceSpec.spec.ports.push({
+
+
+				const port = {
 					"targetPort": portSpec.internal,
 					"protocol": portSpec.type == 'udp' ? 'UDP' : 'TCP',
-					"name": portSpec.name
-				})
-			}
+					"name": `${portSpec.type}-${portSpec.internal}`
+				}
+				if (portSpec.external != 0) {
+					port.nodePort = portSpec.external
+					serviceSpec.spec.type = 'NodePort'
+				}
 
+				serviceSpec.spec.ports.push(port)
+			}
 			return serviceSpec;
 		}
 	},

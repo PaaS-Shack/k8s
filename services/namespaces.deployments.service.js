@@ -153,7 +153,6 @@ module.exports = {
 					if (!ctx) return null
 					return Promise.all(
 						entities.map(async entity => {
-							console.log({ query: { namespace: entity.namespace, deployment: entity.id } })
 							return ctx.call('v1.namespaces.routes.find', {
 								query: { namespace: entity.namespace, deployment: this.encodeID(entity._id), },
 							})
@@ -410,6 +409,45 @@ module.exports = {
 			needEntity: true,
 			permissions: ['namespaces.deployments.remove']
 		},
+		logs: {
+			rest: "GET /:id/logs",
+			permissions: ['namespaces.deployments.remove'],
+			params: {
+				id: { type: "string" },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+				const deployment = await this.resolveEntities(ctx, {
+					id: params.id
+				});
+				if (!deployment) {
+					throw new MoleculerClientError("deployment not found.", 400, "ERR_EMAIL_EXISTS");
+				}
+
+				const dply = await ctx.call('v1.kube.findOne', {
+					_id: deployment.uid
+				})
+				if (!dply || !dply.metadata) {
+					return null;
+				}
+				const pod = await ctx.call('v1.kube.findOne', {
+					kind: 'Pod',
+					'metadata.labels.app': dply.metadata.labels.app,
+					fields: ['metadata.name', 'metadata.namespace']
+				})
+				if (!pod || !pod.metadata) {
+					return null;
+				}
+
+				return ctx.call('v1.kube.logs', {
+					name: pod.metadata.name,
+					namespace: pod.metadata.namespace,
+					cluster: 'nto'
+				}).then((res) => {
+					return res.join('').split('\n')
+				})
+			},
+		},
 		metrics: {
 			rest: "GET /:id/metrics",
 			permissions: ['namespaces.deployments.remove'],
@@ -445,51 +483,51 @@ module.exports = {
 				const q = `sum(container_network_transmit_bytes_total{ pod="${pod.metadata.name}" }) by (pod)`;
 				const start = new Date().getTime() - 24 * 60 * 60 * 1000;
 				const end = new Date();
-				const step =  15 * 60; // 1 point every 6 hours
+				const step = 15 * 60; // 1 point every 6 hours
 				const [
 					transmit_bytes_total, receive_bytes_total,
 					pod_cpu,
 					pod_requests_cpu, pod_limits_cpu,
-			
+
 					pod_memory,
 					pod_requests_memory, pod_limits_memory,
-			
-			
-			
+
+
+
 				] = await Promise.all([
 					this.prom.rangeQuery(
 						`sum(irate(container_network_transmit_bytes_total{pod="${pod.metadata.name}"}[15m])) by (pod)`, start, end, step
-					).then((res)=>res.result.shift()?.values),
+					).then((res) => res.result.shift()?.values),
 					this.prom.rangeQuery(
 						`sum(irate(container_network_receive_bytes_total{pod="${pod.metadata.name}"}[15m])) by (pod)`, start, end, step
-					).then((res)=>res.result.shift()?.values),
+					).then((res) => res.result.shift()?.values),
 					this.prom.rangeQuery(
 						`sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
-					).then((res)=>res.result.shift()?.values),
+					).then((res) => res.result.shift()?.values),
 					this.prom.rangeQuery(
 						`sum(cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
-					).then((res)=>res.result.shift()?.values),
+					).then((res) => res.result.shift()?.values),
 					this.prom.rangeQuery(
 						`sum(cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
-					).then((res)=>res.result.shift()?.values),
-			
+					).then((res) => res.result.shift()?.values),
+
 					this.prom.rangeQuery(
 						`sum(container_memory_working_set_bytes{ pod="${pod.metadata.name}" }) by (container)`, start, end, step
-					).then((res)=>res.result.shift()?.values),
+					).then((res) => res.result.shift()?.values),
 					this.prom.rangeQuery(
 						`sum(cluster:namespace:pod_memory:active:kube_pod_container_resource_requests{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
-					).then((res)=>res.result.shift()?.values),
+					).then((res) => res.result.shift()?.values),
 					this.prom.rangeQuery(
 						`sum(cluster:namespace:pod_memory:active:kube_pod_container_resource_limits{ pod="${pod.metadata.name}" }) by (pod)`, start, end, step
-					).then((res)=>res.result.shift()?.values)
+					).then((res) => res.result.shift()?.values)
 				])
-			
-			
+
+
 				return {
 					transmit_bytes_total, receive_bytes_total,
 					pod_cpu,
 					pod_requests_cpu, pod_limits_cpu,
-			
+
 					pod_memory,
 					pod_requests_memory, pod_limits_memory,
 				}
@@ -746,7 +784,6 @@ module.exports = {
 					})
 				}
 
-				console.log(container)
 
 				if (deployment.image.config?.Cmd) {
 
