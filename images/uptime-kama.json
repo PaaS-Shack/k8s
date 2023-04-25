@@ -1,0 +1,38 @@
+{
+    "name": "uptime-kuma",
+    "imageName": "uptime-kuma",
+    "tag": "1",
+    "namespace": "louislam",
+    "registry": "docker.io",
+    "dockerFile": "/Dockerfile",
+    "source": "frontend",
+    "process": "web",
+    "pullPolicy": "IfNotPresent",
+    "description": null,
+    "repo": false,
+    "config": {
+        "NetworkDisabled": false,
+        "OomKillDisable": false,
+        "Privileged": false,
+        "ReadonlyRootfs": false,
+        "StopTimeout": 10
+    },
+    "envs": [],
+    "links": [],
+    "remote": {},
+    "ports": [
+        {
+            "internal": 3001,
+            "type": "http",
+            "external": 0
+        }
+    ],
+    "volumes": [
+        {
+            "type": "replica",
+            "local": "/app/data",
+            "files": []
+        }
+    ],
+    "size": "mNn92Rm0K3svVd0oXLxW"
+}

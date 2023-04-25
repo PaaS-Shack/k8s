@@ -1,0 +1,76 @@
+{
+    "name": "minio",
+    "imageName": "minio",
+    "tag": "latest",
+    "namespace": "minio",
+    "registry": "docker.io",
+    "dockerFile": "/Dockerfile",
+    "source": "frontend",
+    "process": "web",
+    "pullPolicy": "IfNotPresent",
+    "description": null,
+    "repo": false,
+    "config": {
+        "Cmd": [
+            "server",
+            "--console-address",
+            ":9001",
+            "/data"
+        ],
+        "NetworkDisabled": false,
+        "OomKillDisable": false,
+        "Privileged": false,
+        "ReadonlyRootfs": false,
+        "StopTimeout": 10
+    },
+    "links": [],
+    "remote": {
+        "path": "https://github.com/docker/distribution-library-image.git",
+        "branch": "master",
+        "commit": "0be0d08b29d56bb1ef0fab93c751ca92d6976a19"
+    },
+    "volumes": [
+        {
+            "type": "default",
+            "local": "/data",
+            "files": []
+        }
+    ],
+    "ports": [
+        {
+            "internal": 9000,
+            "type": "http",
+            "name": "frontend",
+            "external": 0
+        },
+        {
+            "internal": 9001,
+            "type": "http",
+            "name": "backend",
+            "subdomain": "console",
+            "external": 0
+        }
+    ],
+    "envs": [
+        {
+            "key": "MINIO_ROOT_USER",
+            "type": "secret",
+            "scope": "RUN_TIME",
+            "index": 0
+        },
+        {
+            "key": "MINIO_ROOT_PASSWORD",
+            "type": "secret",
+            "scope": "RUN_TIME",
+            "index": 0
+        },
+        {
+            "key": "MINIO_BROWSER_REDIRECT_URL",
+            "type": "route",
+            "index": 1,
+            "value": "https://${VHOST}",
+            "scope": "RUN_TIME"
+        }
+    ],
+    "size": "684JBX3vMPs4kKEvx7GZ"
+}

@@ -373,7 +373,8 @@ module.exports = {
 
 			const namespace = await ctx.call('v1.namespaces.resolve', {
 				id: container.annotations['k8s.one-host.ca/namespace'],
-				fields: ['cluster', 'id']
+				fields: ['cluster', 'id'],
+				scope: '-notDeleted'
 			}, options)
 			const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
 				id: container.annotations['k8s.one-host.ca/deployment'],

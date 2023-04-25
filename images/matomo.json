@@ -1,0 +1,99 @@
+{
+    "name": "matomo",
+    "imageName": "matomo",
+    "tag": "latest",
+    "namespace": "bitnami",
+    "registry": "docker.io",
+    "dockerFile": "/Dockerfile",
+    "source": "frontend",
+    "process": "web",
+    "pullPolicy": "IfNotPresent",
+    "description": null,
+    "repo": false,
+    "config": {
+        "NetworkDisabled": false,
+        "OomKillDisable": false,
+        "Privileged": false,
+        "ReadonlyRootfs": false,
+        "StopTimeout": 10
+    },
+    "links": [],
+    "remote": {
+        "path": "https://github.com/docker/distribution-library-image.git",
+        "branch": "master",
+        "commit": "0be0d08b29d56bb1ef0fab93c751ca92d6976a19"
+    },
+    "ports": [
+        {
+            "internal": 80,
+            "type": "http",
+            "external": 0
+        }
+    ],
+    "volumes": [
+        {
+            "type": "default",
+            "local": "/bitnami",
+            "files": []
+        }
+    ],
+    "envs": [
+        {
+            "key": "mysql",
+            "value": "JGwP7rbJ4KtdZ1gEANrQ",
+            "type": "provision",
+            "index": 0,
+            "scope": "RUN_TIME"
+        },
+        {
+            "key": "MYSQL_CLIENT_DATABASE_HOST",
+            "value": "MYSQL_HOST",
+            "type": "map",
+            "index": 0,
+            "scope": "RUN_TIME"
+        },
+        {
+            "key": "MATOMO_DATABASE_NAME",
+            "value": "MYSQL_DATABASE",
+            "type": "map",
+            "index": 0,
+            "scope": "RUN_TIME"
+        },
+        {
+            "key": "MATOMO_DATABASE_USER",
+            "value": "MYSQL_USERNAME",
+            "type": "map",
+            "index": 0,
+            "scope": "RUN_TIME"
+        },
+        {
+            "key": "MATOMO_DATABASE_PASSWORD",
+            "value": "MYSQL_PASSWORD",
+            "type": "map",
+            "index": 0,
+            "scope": "RUN_TIME"
+        },
+        {
+            "key": "MATOMO_ENABLE_PROXY_URI_HEADER",
+            "value": "yes",
+            "type": "as",
+            "index": 0,
+            "scope": "RUN_TIME"
+        },
+        {
+            "key": "MATOMO_ENABLE_ASSUME_SECURE_PROTOCOL",
+            "value": "yes",
+            "type": "as",
+            "index": 0,
+            "scope": "RUN_TIME"
+        },
+        {
+            "key": "MYSQL_CLIENT_FLAVOR",
+            "value": "mysql",
+            "type": "as",
+            "index": 0,
+            "scope": "RUN_TIME"
+        }
+    ],
+    "size": "B9ANrO3WMGUzoZk3l8wK"
+}

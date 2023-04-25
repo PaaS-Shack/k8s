@@ -15,7 +15,7 @@ module.exports = {
 
 	mixins: [
 		DbService({}),
-		Cron,
+		//Cron,
 		Membership({
 			permissions: 'namespaces.pvcs'
 		})
@@ -43,9 +43,13 @@ module.exports = {
 				type: "string",
 				required: true,
 			},
+			deployment: {
+				type: "string",
+				required: false,
+			},
 			cluster: {
 				type: "string",
-				required: true,
+				required: false,
 			},
 			size: {
 				type: "number",
@@ -64,7 +68,8 @@ module.exports = {
 			type: {
 				type: "enum",
 				values: ["local", "replica", "default"],
-				required: true,
+				default: 'default',
+				required: false,
 			},
 
 			status: {
@@ -138,8 +143,23 @@ module.exports = {
 				});
 			}
 		},
+		shared: {
+			rest: "GET /shared",
+			params: {
+				namespace: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				return this.findEntities(ctx, {
+					query: {
+						namespace:params.namespace,
+						shared: true
+					}
+				});
+			}
+		},
 		deleteNamespacedPVC: {
-			rest: "DELETE /namespaces/:namespace/pvc/:name",
 			params: {
 				namespace: { type: "string", optional: false },
 				name: { type: "string", optional: false },
@@ -154,7 +174,6 @@ module.exports = {
 			}
 		},
 		readNamespacedPVC: {
-			rest: "GET /namespaces/:namespace/pvc/:name",
 			params: {
 				namespace: { type: "string", optional: false },
 				name: { type: "string", optional: false },
@@ -169,7 +188,6 @@ module.exports = {
 			}
 		},
 		createNamespacedPVC: {
-			rest: "POST /namespaces/:namespace/pvc",
 			params: {
 				namespace: { type: "string", optional: false },
 				name: { type: "string", optional: false },
@@ -227,9 +245,15 @@ module.exports = {
 		async "namespaces.pvcs.created"(ctx) {
 			const pvc = ctx.params.data;
 
+			const namespace = await ctx.call('v1.namespaces.resolve', {
+				id: pvc.namespace,
+				fields: ['name', 'cluster']
+			})
+
+
 			const claim = await ctx.call('v1.namespaces.pvcs.createNamespacedPVC', {
-				namespace: pvc.namespace,
-				cluster: pvc.cluster,
+				namespace: namespace.name,
+				cluster: namespace.cluster,
 				name: pvc.name,
 				type: pvc.type,
 				shared: pvc.shared,
@@ -240,9 +264,14 @@ module.exports = {
 		async "namespaces.pvcs.removed"(ctx) {
 			const pvc = ctx.params.data;
 
+			const namespace = await ctx.call('v1.namespaces.resolve', {
+				id: pvc.namespace,
+				fields: ['name', 'cluster']
+			})
+
 			const claim = await ctx.call('v1.namespaces.pvcs.deleteNamespacedPVC', {
-				namespace: pvc.namespace,
-				cluster: pvc.cluster,
+				namespace: namespace.name,
+				cluster: namespace.cluster,
 				name: pvc.name
 			})
 			this.logger.info(`PVC deleted ${claim.metadata.name}`, claim.status);

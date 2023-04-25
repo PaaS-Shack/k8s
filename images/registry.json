@@ -1,0 +1,42 @@
+{
+    "name": "registry",
+    "imageName": "registry",
+    "tag": "2",
+    "namespace": "library",
+    "registry": "docker.io",
+    "dockerFile": "/Dockerfile",
+    "source": "frontend",
+    "process": "web",
+    "pullPolicy": "IfNotPresent",
+    "description": null,
+    "repo": false,
+    "config": {
+        "NetworkDisabled": false,
+        "OomKillDisable": false,
+        "Privileged": false,
+        "ReadonlyRootfs": false,
+        "StopTimeout": 10
+    },
+    "envs": [],
+    "links": [],
+    "remote": {
+        "path": "https://github.com/docker/distribution-library-image.git",
+        "branch": "master",
+        "commit": "0be0d08b29d56bb1ef0fab93c751ca92d6976a19"
+    },
+    "ports": [
+        {
+            "internal": 5000,
+            "type": "http",
+            "external": 0
+        }
+    ],
+    "volumes": [
+        {
+            "type": "replica",
+            "local": "/var/lib/registry",
+            "files": []
+        }
+    ],
+    "size": "684JBX3vMPs4kKEvx7GZ"
+}

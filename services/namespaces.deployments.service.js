@@ -16,7 +16,7 @@ module.exports = {
 
 	mixins: [
 		DbService({}),
-		Cron,
+		//Cron,
 		Membership({
 			permissions: 'deployments'
 		})
@@ -28,6 +28,7 @@ module.exports = {
 	dependencies: [
 
 	],
+
 	/**
 	 * Service settings
 	 */
@@ -228,7 +229,7 @@ module.exports = {
 									})
 							}
 
-							return ctx.call('v1.namespaces.resolve', { id: entity.namespace, fields: ['name', 'cluster'] })
+							return ctx.call('v1.namespaces.resolve', { id: entity.namespace, fields: ['name', 'cluster'],scope:'-notDeleted' })
 								.then((namespace) => {
 									return ctx.call("v1.kube.readNamespacedDeployment", { name: entity.name, namespace: namespace.name, cluster: namespace.cluster })
 										.then((deployment) => `${deployment.status.availableReplicas ? deployment.status.availableReplicas : 0}:${deployment.status.readyReplicas ? deployment.status.readyReplicas : 0}:${deployment.status.replicas ? deployment.status.replicas : 0}:${deployment.status.observedGeneration}`)
@@ -324,6 +325,20 @@ module.exports = {
 					);
 				}
 			},
+			attachments: {
+				type: 'array',
+				items: {
+					type: 'object',
+					props: {
+						local: { type: 'string', empty: false, required: true, optional: false },
+						pvc: { type: 'string', empty: false, required: true, optional: false }
+					}
+				},
+				default: [],
+				required: false
+			},
+
+
 			options: { type: "object" },
 			createdAt: {
 				type: "number",
@@ -806,6 +821,24 @@ module.exports = {
 					}
 				}
 
+				for (let index = 0; index < deployment.attachments.length; index++) {
+					const attachment = deployment.attachments[index];
+					const pvc = await ctx.call('v1.namespaces.pvcs.resolve', {
+						id: attachment.pvc
+					})
+					const name = pvc.name;
+					volumes.push({
+						name,
+						persistentVolumeClaim: {
+							claimName: `${name}-pv-claim-shared`
+						}
+					})
+					container.volumeMounts.push({
+						name,
+						mountPath: attachment.local
+					})
+				}
+
 				for (let index = 0; index < deployment.image.volumes.length; index++) {
 					const element = deployment.image.volumes[index];
 					const name = `${deployment.name}-${index}`;
@@ -928,7 +961,7 @@ module.exports = {
 				const element = image.volumes[index];
 				const name = `${deployment.name}-${index}`;
 				await ctx.call('v1.namespaces.pvcs.create', {
-					namespace: namespace.name,
+					namespace: namespace.id,
 					cluster: namespace.cluster,
 					name,
 					mountPath: element.local,

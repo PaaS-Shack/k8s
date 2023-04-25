@@ -125,10 +125,11 @@ module.exports = {
 
 		scopes: {
 			notDeleted: { deletedAt: null },
+			async namespace(query, ctx, params) { return this.validateHasPermissions(query, ctx, params) },
 			...Membership.SCOPE,
 		},
 
-		defaultScopes: ["notDeleted", ...Membership.DSCOPE]
+		defaultScopes: ["notDeleted","namesapce", ...Membership.DSCOPE]
 	},
 
 	crons: [
@@ -147,18 +148,19 @@ module.exports = {
 	actions: {
 
 		create: {
-			permissions: ['namespaces.create'],
+			rest:false,
+			permissions: ['events.create'],
 		},
 		list: {
-			permissions: ['namespaces.list'],
+			permissions: ['events.list'],
 			params: {
-				//domain: { type: "string" }
+				namespace: { type: "string" }
 			}
 		},
 
 		find: {
 			rest: "GET /find",
-			permissions: ['namespaces.find'],
+			permissions: ['events.find'],
 			params: {
 				//domain: { type: "string" }
 			}
@@ -166,7 +168,7 @@ module.exports = {
 
 		count: {
 			rest: "GET /count",
-			permissions: ['namespaces.count'],
+			permissions: ['events.count'],
 			params: {
 				//domain: { type: "string" }
 			}
@@ -174,19 +176,21 @@ module.exports = {
 
 		get: {
 			needEntity: true,
-			permissions: ['namespaces.get'],
+			permissions: ['events.get'],
 		},
 
 		update: {
+			rest:false,
 			needEntity: true,
-			permissions: ['namespaces.update'],
+			permissions: ['events.update'],
 		},
 
 		replace: false,
 
 		remove: {
+			rest:false,
 			needEntity: true,
-			permissions: ['namespaces.remove'],
+			permissions: ['events.remove'],
 
 		},
 		clean: {
@@ -246,6 +250,33 @@ module.exports = {
 	 * Methods
 	 */
 	methods: {
+		async validateHasPermissions(query, ctx, params) {
+			// Adapter init
+			if (!ctx) return query;
+
+			if (params.namespace) {
+				const res = await ctx.call("v1.namespaces.resolve", {
+					id: params.namespace,
+					fields: ['id']
+				});
+
+				if (res) {
+					query.namespace = params.namespace;
+					return query;
+				}
+				throw new MoleculerClientError(
+					`You have no right for the namespace '${params.namespace}'`,
+					403,
+					"ERR_NO_PERMISSION",
+					{ namespace: params.namespace }
+				);
+			}
+			if (ctx.action.params.namespace && !ctx.action.params.namespace.optional) {
+				throw new MoleculerClientError(`namespace is required`, 422, "VALIDATION_ERROR", [
+					{ type: "required", field: "namespace" }
+				]);
+			}
+		},
 		async lookupEvent(uid) {
 			return this.findEntity(null, {
 				query: { uid },
