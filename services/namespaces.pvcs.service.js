@@ -164,11 +164,12 @@ module.exports = {
 				namespace: { type: "string", optional: false },
 				name: { type: "string", optional: false },
 				cluster: { type: "string", optional: false },
+				shared: { type: "boolean", optional: true, default: false },
 			},
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
 				const results = []
-				const claimName = `${params.name}-pv-claim`
+				const claimName = `${params.name}-pv-claim${params.shared ? '-shared' : ''}`
 
 				return ctx.call('v1.kube.deleteNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, name: claimName })
 			}
@@ -178,11 +179,12 @@ module.exports = {
 				namespace: { type: "string", optional: false },
 				name: { type: "string", optional: false },
 				cluster: { type: "string", optional: false },
+				shared: { type: "boolean", optional: true, default: false },
 			},
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
 				const results = []
-				const claimName = `${params.name}-pv-claim`;
+				const claimName = `${params.name}-pv-claim${params.shared ? '-shared' : ''}`
 
 				return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', { namespace: params.namespace, cluster: params.cluster, name: claimName })
 			}
@@ -266,12 +268,14 @@ module.exports = {
 
 			const namespace = await ctx.call('v1.namespaces.resolve', {
 				id: pvc.namespace,
-				fields: ['name', 'cluster']
+				fields: ['name', 'cluster'],
+				scope:'-notDeleted'
 			})
 
 			const claim = await ctx.call('v1.namespaces.pvcs.deleteNamespacedPVC', {
 				namespace: namespace.name,
 				cluster: namespace.cluster,
+				shared: pvc.shared,
 				name: pvc.name
 			})
 			this.logger.info(`PVC deleted ${claim.metadata.name}`, claim.status);

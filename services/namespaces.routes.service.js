@@ -258,6 +258,14 @@ module.exports = {
 			}
 
 		},
+		async "namespaces.routes.removed"(ctx) {
+			const { id, route, owner } = ctx.params.data;
+			const options = { meta: { userID: owner } };
+			await ctx.call('v1.routes.remove', {
+				id: route
+			}, options);
+			this.logger.info(`Remove route ${route} id ${id}`)
+		},
 		async "namespaces.deployments.removed"(ctx) {
 			const deployment = ctx.params.data;
 
@@ -270,7 +278,7 @@ module.exports = {
 					namespace: deployment.namespace
 				}
 			})
-
+			console.log('routes', routes)
 			for (let index = 0; index < routes.length; index++) {
 				const { id, route } = routes[index];
 				await ctx.call('v1.routes.remove', {
@@ -380,7 +388,7 @@ module.exports = {
 				id: container.annotations['k8s.one-host.ca/deployment'],
 				namespace: namespace.id,
 				fields: ['vHosts', 'id'],
-				scope: '-notDeleted'
+				scope: ['-notDeleted', '-membership']
 			}, options)
 			const image = await ctx.call('v1.images.resolve', {
 				id: container.annotations['k8s.one-host.ca/image']

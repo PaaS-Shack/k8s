@@ -314,12 +314,12 @@ module.exports = {
 				const namespace = await ctx.call('v1.namespaces.update', {
 					id: resource.metadata.annotations['k8s.one-host.ca/id'],
 					uid: null,
-					scope: false
+					scope: ['-notDeleted', '-membership']
 				}, { meta: { userID: resource.metadata.annotations['k8s.one-host.ca/owner'] } }).catch((err)=>{
 
 				})
 
-				this.logger.info(`Kube has deleted namespace ${namespace.name} on cluster ${namespace.cluster} ${namespace.uid}`)
+				this.logger.info(`Kube has deleted namespace ${namespace?.name} on cluster ${namespace?.cluster} ${namespace?.uid}`)
 			}
 		},
 	},

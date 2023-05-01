@@ -229,7 +229,7 @@ module.exports = {
 									})
 							}
 
-							return ctx.call('v1.namespaces.resolve', { id: entity.namespace, fields: ['name', 'cluster'],scope:'-notDeleted' })
+							return ctx.call('v1.namespaces.resolve', { id: entity.namespace, fields: ['name', 'cluster'], scope: '-notDeleted' })
 								.then((namespace) => {
 									return ctx.call("v1.kube.readNamespacedDeployment", { name: entity.name, namespace: namespace.name, cluster: namespace.cluster })
 										.then((deployment) => `${deployment.status.availableReplicas ? deployment.status.availableReplicas : 0}:${deployment.status.readyReplicas ? deployment.status.readyReplicas : 0}:${deployment.status.replicas ? deployment.status.replicas : 0}:${deployment.status.observedGeneration}`)
@@ -493,12 +493,12 @@ module.exports = {
 				if (!pod || !pod.metadata) {
 					return null;
 				}
-
+				
 				const bytesToMB = async (res) => res.result[0] ? (res.result[0].value.value / 1024 / 1024).toFixed(2) : 0
 				const q = `sum(container_network_transmit_bytes_total{ pod="${pod.metadata.name}" }) by (pod)`;
 				const start = new Date().getTime() - 24 * 60 * 60 * 1000;
 				const end = new Date();
-				const step = 15 * 60; // 1 point every 6 hours
+				const step = 1 * 60; // 1 point every 6 hours
 				const [
 					transmit_bytes_total, receive_bytes_total,
 					pod_cpu,
@@ -546,7 +546,6 @@ module.exports = {
 					pod_memory,
 					pod_requests_memory, pod_limits_memory,
 				}
-				return this.prom.rangeQuery(q, start, end, step)
 			}
 		},
 		status: {
@@ -1148,7 +1147,8 @@ module.exports = {
 			if (params.namespace) {
 				const res = await ctx.call("v1.namespaces.resolve", {
 					id: params.namespace,
-					fields: ['id']
+					fields: ['id'],
+					scope: ['-notDeleted']
 				});
 
 				if (res) {
