@@ -80,7 +80,10 @@ module.exports = {
 						entities.map(async entity => {
 							return (ctx || this.broker)
 								.call("v1.namespaces.pvcs.readNamespacedPVC", { name: entity.name, namespace: entity.namespace, cluster: entity.cluster })
-								.then((pvc) => pvc.status)
+								.then((pvc) => {
+									console.log(pvc)
+									return pvc.status
+								})
 								.catch((err) => err.type)
 						})
 					);

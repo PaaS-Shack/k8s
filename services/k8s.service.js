@@ -90,7 +90,7 @@ module.exports = {
                         bills.push({
                             name: `bill-${deployment.id}-${deployment.name}`,
                             hours,
-                            cost: hours * 0.015
+                            cost: Number((hours * 0.015).toFixed(4))
                         })
                         console.log(deployments)
                     }
