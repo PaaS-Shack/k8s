@@ -234,15 +234,15 @@ module.exports = {
 		},
 		async "kube.events.added"(ctx) {
 			const event = ctx.params;
-			await this.onEvent(ctx, event)
+			//await this.onEvent(ctx, event)
 		},
 		async "kube.events.modified"(ctx) {
 			const event = ctx.params;
-			await this.onEvent(ctx, event)
+			//await this.onEvent(ctx, event)
 		},
 		async "kube.events.deleted"(ctx) {
 			const event = ctx.params;
-			await this.onEvent(ctx, event)
+			//await this.onEvent(ctx, event)
 		},
 	},
 
