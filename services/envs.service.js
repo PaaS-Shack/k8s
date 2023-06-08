@@ -177,7 +177,7 @@ module.exports = {
 
 				} else if (params.type == 'route') {
 
-					const deployment = await ctx.call('v1.namespaces.deployments.resolve', { id: params.deployment, fields: ['name', 'zone', 'vHosts', 'image'] })
+					const deployment = await ctx.call('v1.namespaces.deployments.resolve', { id: params.deployment, fields: ['name', 'zone', 'vHosts', 'image', 'owner'] })
 					const image = await ctx.call('v1.images.resolve', { id: deployment.image, fields: ['ports'] })
 					const vHost = deployment.vHosts[0];
 					const routePorts = image.ports.filter((p) => p.type == 'http' || p.type == 'https')
@@ -187,7 +187,17 @@ module.exports = {
 					} else {
 						params.value = `${params.value.replace('${VHOST}', `${vHost}`)}`
 					}
-					
+
+				} else if (params.type == 'username') {
+					const deployment = await ctx.call('v1.namespaces.deployments.resolve', { id: params.deployment, namespace: params.namespace, fields: ['owner'] })
+					const user = await ctx.call('v1.accounts.resolve', { id: deployment.owner, fields: ['username'] })
+					params.value = user.username
+				} else if (params.type == 'namespace') {
+					const namespace = await ctx.call('v1.namespaces.resolve', { id: params.namespace, fields: ['name'] })
+					params.value = namespace.name
+				} else if (params.type == 'deployment') {
+					const deployment = await ctx.call('v1.namespaces.deployments.resolve', { id: params.deployment, namespace: params.namespace, fields: ['name'] })
+					params.value = deployment.name
 				}
 				return this.createEntity(ctx, params, { permissive: true });
 
@@ -201,6 +211,21 @@ module.exports = {
 				console.log(entities)
 				return Promise.allSettled(entities.map((entity) =>
 					this.removeEntity(ctx, { scope: false, id: entity.id })))
+			}
+		},
+
+		rePatchConfigMap: {
+			params: {
+				deployment: { type: "string", min: 3, optional: false },
+				namespace: { type: "string", min: 3, optional: false }
+			},
+			permissions: ['teams.create'],
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+				return this.patchConfigMap(ctx, {
+					deployment: params.deployment,
+					namespace: params.namespace
+				})
 			}
 		},
 		patchConfigMap: {

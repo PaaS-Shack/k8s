@@ -79,12 +79,12 @@ module.exports = {
 			source: {
 				type: "string",
 				empty: false,
-				required: true
+				required: false
 			},
 			process: {
 				type: "string",
 				empty: false,
-				required: true
+				required: false
 			},
 			pullPolicy: {
 				type: 'enum',

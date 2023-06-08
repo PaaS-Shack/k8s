@@ -115,7 +115,7 @@ const env = {
 		],
 		type: {
 			type: 'enum',
-			values: ['secret', 'username', 'team', 'application', 'provided', 'provision', 'as', 'route', 'map'],
+			values: ['secret', 'username', 'namespace', 'deployment', 'provided', 'provision', 'as', 'route', 'map'],
 			default: 'as',
 			required: true
 		},
@@ -190,7 +190,8 @@ module.exports = {
 
 	ports: {
 		type: 'array',
-		required: true, optional: false,
+		required: true, 
+		optional: false,
 		default: [],
 		items: {
 			type: 'object',

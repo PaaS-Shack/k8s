@@ -91,7 +91,7 @@ module.exports = {
 				populate: {
 					action: "v1.routes.hosts.resolve",
 					params: {
-						fields: ["id", "vHost", "strategy"]
+						fields: ["id", "hostname", "port"]
 					}
 				}
 			},
