@@ -7,11 +7,13 @@ const { MoleculerClientError } = require("moleculer").Errors;
  * Addons service
  */
 module.exports = {
-	name: "networks",
+	name: "k8s.networks",
 	version: 1,
 
 	mixins: [
-		DbService({})
+		DbService({
+			permissions: "k8s.networks",
+		})
 	],
 
 	/**
@@ -23,7 +25,7 @@ module.exports = {
 	 * Service settings
 	 */
 	settings: {
-		rest: "/v1/networks",
+		rest: "/v1/k8s/networks",
 
 
 		fields: {

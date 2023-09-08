@@ -140,9 +140,12 @@ module.exports = {
 
 	actions: {
 		pack: {
-			description: "Add members to the addon",
+			description: "pack limitranges",
 			params: {
-
+				id: {
+					type: "string",
+					optional: true,
+				},
 			},
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
@@ -167,8 +170,9 @@ module.exports = {
 
 					return res;
 				}
-				return this.findEntities(null, {
 
+				return this.findEntities(null, {
+					id: params.id
 				}).then((res) => res.map((limit) => {
 
 					const entity = {
@@ -259,13 +263,88 @@ module.exports = {
 	 */
 	events: {
 
+		/**
+		 * On namespace created create corresponding resourcequota
+		 */
+
+		"k8s.namespaces.created": {
+			async handler(ctx) {
+				const namespace = ctx.params;
+
+				// create resourcequota
+				return this.createLimitRange(ctx, namespace);
+			}
+		},
+
+		/**
+		 * On namespace deleted delete corresponding resourcequota
+		 */
+		"k8s.namespaces.deleted": {
+			async handler(ctx) {
+				const namespace = ctx.params;
+
+				// delete resourcequota
+				return this.deleteLimitRange(ctx, namespace);
+			}
+		},
 	},
 
 	/**
 	 * Methods
 	 */
 	methods: {
+		/**
+		 * Create namedspace limit range
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise} 
+		 */
+		async createLimitRange(ctx, namespace) {
+			const name = namespace.name;
 
+			// limit range schema
+			const LimitRange = {
+				apiVersion: "v1",
+				kind: "LimitRange",
+				metadata: {
+					name: `${name}-limitrange`,
+					labels: {
+						name: `${name}-limitrange`
+					}
+				},
+				spec: {
+					limits: await ctx.call('v1.limitranges.pack')
+				}
+			};
+
+			// create limit range
+			return ctx.call('v1.kube.createNamespacedLimitRange', {
+				namespace: name,
+				body: LimitRange,
+				cluster: namespace.cluster
+			});
+		},
+
+		/**
+		 * Delete namedspace limit range
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise}
+		 */
+		async deleteLimitRange(ctx, namespace) {
+			const name = namespace.name;
+
+			// delete limit range
+			return ctx.call('v1.kube.deleteNamespacedLimitRange', {
+				namespace: name,
+				name: `${name}-limitrange`,
+				cluster: namespace.cluster
+			});
+		},
 	},
 
 	/**

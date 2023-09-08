@@ -10,13 +10,15 @@ const { MoleculerClientError } = require("moleculer").Errors;
  * attachments of addons service
  */
 module.exports = {
-	name: "namespaces",
+	name: "k8s.namespaces",
 	version: 1,
 
 	mixins: [
-		DbService({}),
+		DbService({
+			permissions: 'k8s.namespaces'
+		}),
 		Membership({
-			permissions: 'namespaces'
+			permissions: 'k8s.namespaces'
 		})
 	],
 
@@ -30,13 +32,15 @@ module.exports = {
 	 * Service settings
 	 */
 	settings: {
-		rest: "/v1/namespaces/",
+		rest: "/v1/k8s/namespaces/",
 
 		fields: {
 
 			name: {
 				type: "string",
 				required: true,
+				trim: true,
+				pattern: /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/,
 				validate: "validateName",
 			},
 			description: {
@@ -46,7 +50,38 @@ module.exports = {
 			},
 			uid: {
 				type: "string",
+				default: null,
 				required: false,
+			},
+			resourcequota: {
+				type: "string",
+				required: true,
+				populate: {
+					action: "v1.resourcequotas.resolve",
+				},
+			},
+			domain: {
+				type: "string",
+				required: true,
+				populate: {
+					action: "v1.domains.resolve",
+				},
+				validate: "validateDomain",
+			},
+			ingress: {
+				type: "array",
+				virtual: true,
+				populate: {
+					action: "v1.ingress.list",
+				}
+			},
+			zone: {
+				type: "string",
+				required: true,
+			},
+			cluster: {
+				type: "string",
+				required: true,
 			},
 			status: {
 				type: "boolean",
@@ -80,8 +115,7 @@ module.exports = {
 									fields: ['status']
 								}).then((res) => {
 									return res.status
-								})
-									.catch((err) => err.type)
+								}).catch((err) => err.type)
 							}
 							return (ctx || this.broker)
 								.call('v1.kube.readNamespacedResourceQuota', { namespace: entity.name, name: `${entity.name}-resourcequota`, cluster: entity.cluster })
@@ -91,72 +125,19 @@ module.exports = {
 					);
 				}
 			},
-			resourcequota: {
-				type: "string",
-				required: true,
-				populate: {
-					action: "v1.resourcequotas.resolve",
-					params: {
-						//fields: ["id", "username", "fullName", "avatar"]
-					}
-				},
-			},
-			domain: {
-				type: "string",
-				required: true,
-				populate: {
-					action: "v1.domains.resolve",
-					params: {
-						//fields: ["id", "username", "fullName", "avatar"]
-					}
-				},
-				validate: "validateDomain",
-			},
-			ingress: {
-				type: "array",
-				virtual: true,
-				populate: {
-					action: "v1.ingress.list",
-					params: {
-						//fields: ["id", "hostname", "port"]
-					}
-				}
-			},
-			zone: {
-				type: "string",
-				required: true,
-			},
-			cluster: {
-				type: "string",
-				required: true,
-			},
-			options: { type: "object" },
-			createdAt: {
-				type: "number",
-				readonly: true,
-				onCreate: () => Date.now(),
-			},
-			updatedAt: {
-				type: "number",
-				readonly: true,
-				onUpdate: () => Date.now(),
-			},
-			deletedAt: {
-				type: "number",
-				readonly: true,
-				hidden: "byDefault",
-				onRemove: () => Date.now(),
-			},
-			...Membership.FIELDS,
+
+
+			...DbService.FIELDS,// inject dbservice fields
+			...Membership.FIELDS,// inject membership fields
 		},
 		defaultPopulates: ['quota', 'status'],
 
 		scopes: {
-			notDeleted: { deletedAt: null },
+			...DbService.SCOPE,
 			...Membership.SCOPE,
 		},
 
-		defaultScopes: ["notDeleted", ...Membership.DSCOPE]
+		defaultScopes: [...DbService.DSCOPE, ...Membership.DSCOPE]
 	},
 
 	/**
@@ -164,50 +145,9 @@ module.exports = {
 	 */
 
 	actions: {
+		...DbService.FIELDS,
+		...Membership.FIELDS,
 
-		create: {
-			permissions: ['namespaces.create'],
-		},
-		list: {
-			permissions: ['namespaces.list'],
-			params: {
-				//domain: { type: "string" }
-			}
-		},
-
-		find: {
-			rest: "GET /find",
-			permissions: ['namespaces.find'],
-			params: {
-				//domain: { type: "string" }
-			}
-		},
-
-		count: {
-			rest: "GET /count",
-			permissions: ['namespaces.count'],
-			params: {
-				//domain: { type: "string" }
-			}
-		},
-
-		get: {
-			needEntity: true,
-			permissions: ['namespaces.get'],
-		},
-
-		update: {
-			needEntity: true,
-			permissions: ['namespaces.update'],
-		},
-
-		replace: false,
-
-		remove: {
-			needEntity: true,
-			permissions: ['namespaces.remove'],
-
-		},
 		clean: {
 			params: {},
 			async handler(ctx) {
@@ -242,8 +182,75 @@ module.exports = {
 	events: {
 		async "namespaces.created"(ctx) {
 			const namespace = ctx.params.data;
-			const name = namespace.name
 
+			this.logger.info(`Creating namespace ${namespace.name} on cluster ${namespace.cluster}`);
+			await this.createNamespace(ctx, namespace);
+
+		},
+		async "namespaces.removed"(ctx) {
+			const namespace = ctx.params.data;
+
+			this.logger.info(`Deleting namespace limit range ${namespace.name} on cluster ${namespace.cluster}`);
+			await this.deleteLimitRange(ctx, namespace);
+
+		},
+		async "kube.namespaces.added"(ctx) {
+			const resource = ctx.params;
+			// k8s resource watcher will trigger this event
+
+			//if no annotation, ignore
+			if (!resource.metadata.annotations)
+				return;
+
+			// namespace id is stored in annotation
+			const id = resource.metadata.annotations['k8s.one-host.ca/id'];
+
+			// if no id, ignore
+			if (!id)
+				return;
+
+			// find namespace by id	
+			await this.updateUid(ctx, { id }, resource.metadata.uid);
+			this.logger.info(`Kube has created namespace ${resource.metadata.name} on cluster ${resource.metadata.cluster} ${resource.metadata.uid}`)
+
+		},
+		async "kube.namespaces.deleted"(ctx) {
+			const resource = ctx.params;
+			// k8s resource watcher will trigger this event
+
+			//if no annotation, ignore
+			if (!resource.metadata.annotations)
+				return;
+
+			// namespace id is stored in annotation
+			const id = resource.metadata.annotations['k8s.one-host.ca/id'];
+
+			// if no id, ignore
+			if (!id)
+				return;
+
+			await this.updateUid(ctx, { id }, null);
+			this.logger.info(`Kube has deleted namespace ${resource.metadata.name} on cluster ${resource.metadata.cluster} ${resource.metadata.uid}`)
+		},
+	},
+
+	/**
+	 * Methods
+	 */
+	methods: {
+		/**
+		 * Create k8s namespace
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise} 
+		 */
+		async createNamespace(ctx, namespace) {
+
+			const name = namespace.name;
+
+			// naamespace schema
 			const Namespace = {
 				apiVersion: "v1",
 				kind: "Namespace",
@@ -252,82 +259,74 @@ module.exports = {
 					annotations: {
 						'k8s.one-host.ca/owner': namespace.owner,
 						'k8s.one-host.ca/name': namespace.name,
-						'k8s.one-host.ca/id': namespace.id
+						'k8s.one-host.ca/id': namespace.id,
 					},
 					labels: {
 						name
 					}
 				}
-			}
-			const LimitRange = {
-				apiVersion: "v1",
-				kind: "LimitRange",
-				metadata: {
-					name: `${name}-limitrange`,
-					labels: {
-						name: `${name}-limitrange`
-					}
-				},
-				spec: {
-					limits: await ctx.call('v1.limitranges.pack')
-				}
-			}
-			const ResourceQuota = {
-				apiVersion: "v1",
-				kind: "ResourceQuota",
-				metadata: {
-					name: `${name}-resourcequota`
-				},
-				spec: {
-					hard: await ctx.call('v1.resourcequotas.pack', { id: namespace.resourcequota })
-				}
-			}
+			};
 
-			this.logger.info(`Creating namespace ${namespace.name} on cluster ${namespace.cluster}`)
-			await ctx.call('v1.kube.createNamespace', { body: Namespace, cluster: namespace.cluster }).catch(() => null);
-			await ctx.call('v1.kube.createNamespacedLimitRange', { namespace: name, body: LimitRange, cluster: namespace.cluster }).catch(() => null);
-			await ctx.call('v1.kube.createNamespacedResourceQuota', { namespace: name, body: ResourceQuota, cluster: namespace.cluster }).catch(() => null);
+			// create namespace
+			return ctx.call('v1.kube.createNamespace', { body: Namespace, cluster: namespace.cluster });
 		},
-		async "namespaces.removed"(ctx) {
-			const namespace = ctx.params.data;
-			const name = namespace.name
-			this.logger.info(`Removing namespace ${namespace.name} on cluster ${namespace.cluster}`)
-			await ctx.call('v1.kube.deleteNamespace', { name, cluster: namespace.cluster })
-			await ctx.call('v1.kube.deleteNamespacedLimitRange', { namespace: name, name: `${name}-limitrange`, cluster: namespace.cluster })
-			await ctx.call('v1.kube.deleteNamespacedResourceQuota', { namespace: name, name: `${name}-resourcequota`, cluster: namespace.cluster })
+
+		/**
+		 * Delete k8s namespace
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise} 
+		 */
+		async deleteNamespace(ctx, namespace) {
+			const name = namespace.name;
+
+			// delete namespace
+			return ctx.call('v1.kube.deleteNamespace', {
+				name,
+				cluster: namespace.cluster
+			});
 		},
-		async "kube.namespaces.added"(ctx) {
-			const resource = ctx.params;
-			if (resource.metadata.annotations && resource.metadata.annotations['k8s.one-host.ca/id']) {
-				const namespace = await ctx.call('v1.namespaces.update', {
-					id: resource.metadata.annotations['k8s.one-host.ca/id'],
-					uid: resource.metadata.uid
-				}, { meta: { userID: resource.metadata.annotations['k8s.one-host.ca/owner'] } })
 
-				this.logger.info(`Kube has created namespace ${namespace.name} on cluster ${namespace.cluster} ${namespace.uid}`)
-			}
+		/**
+		 * find namespace by name
+		 * 
+		 * @param {String} name - namespace name
+		 */
+		async findByName(name) {
+			return this.findEntity(null, {
+				query: { name },
+				scope: ["-membership"],
+			});
 		},
-		async "kube.namespaces.deleted"(ctx) {
-			const resource = ctx.params;
-			console.log(resource)
-			if (resource.metadata.annotations && resource.metadata.annotations['k8s.one-host.ca/id']) {
-				const namespace = await ctx.call('v1.namespaces.update', {
-					id: resource.metadata.annotations['k8s.one-host.ca/id'],
-					uid: null,
-					scope: ['-notDeleted', '-membership']
-				}, { meta: { userID: resource.metadata.annotations['k8s.one-host.ca/owner'] } }).catch((err)=>{
 
-				})
-
-				this.logger.info(`Kube has deleted namespace ${namespace?.name} on cluster ${namespace?.cluster} ${namespace?.uid}`)
-			}
+		/**
+		 * find namespace by id
+		 * 
+		 * @param {String} id - namespace id
+		 */
+		async findById(id) {
+			return this.findEntity(null, {
+				query: { id },
+				scope: ["-membership"],
+			});
 		},
-	},
 
-	/**
-	 * Methods
-	 */
-	methods: {
+		/**
+		 * update namespace k8s uid
+		 * 
+		 * @param {Object} ctx - context
+		 * @param {Object} namespace - namespace entity
+		 * @param {String} uid - k8s uid
+		 */
+		async updateUid(ctx, namespace, uid) {
+			return this.updateEntity(ctx, {
+				id: namespace.id,
+				uid,
+				scope: ["-membership"],
+			});
+		},
 
 		async validateDomain({ ctx, value, params, id, entity }) {
 			return ctx.call("v1.domains.resolve", { id: params.domain })
@@ -349,13 +348,13 @@ module.exports = {
 	 * Service started lifecycle event handler
 	 */
 	async started() {
-		//this.actions.startAll().catch(() => null)
+
 	},
 
 	/**
 	 * Service stopped lifecycle event handler
 	 */
-	stopped() {
+	async stopped() {
 
 	}
 };

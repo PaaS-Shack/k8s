@@ -8,18 +8,27 @@ const ConfigLoader = require("config-mixin");
 const { MoleculerClientError } = require("moleculer").Errors;
 
 /**
- * attachments of addons service
+ * Kubernetes resourcequotas service
  */
 module.exports = {
-	name: "resourcequotas",
+	/**
+	 * Service name
+	 */
+	name: "k8s.resourcequotas",
+
+	/**
+	 * Service version
+	 * 1.0.0
+	 */
 	version: 1,
 
+	/**
+	 * Mixins
+	 * 
+	 * More info: https://moleculer.services/docs/0.14/services.html#Mixins
+	 */
 	mixins: [
-		DbService({
-			cache: {
-
-			},
-		}),
+		DbService({}),
 		ConfigLoader(['resourcequotas.**'])
 	],
 
@@ -34,27 +43,17 @@ module.exports = {
 	 * Service settings
 	 */
 	settings: {
-		rest: "/v1/resourcequotas/",
+		rest: "/v1/k8s/resourcequotas/", //  Rest api path
 
-		fields: {
-			id: {
-				type: "string",
-				primaryKey: true,
-				secure: true,
-				columnName: "_id"
-			},
-
-
+		fields: {// db fields for resourcequotas
+			// resourcequota name
 			name: {
 				type: "string",
-				required: true,
 				empty: false,
+				required: true
 			},
-			group: {
-				type: "string",
-				required: true,
-				empty: false,
-			},
+
+			// resourcequota requests
 			"requests.cpu": {
 				type: "number",
 				required: true
@@ -67,6 +66,7 @@ module.exports = {
 				type: "number",
 				required: true
 			},
+			// resourcequota limits
 			"limits.cpu": {
 				type: "number",
 				required: true
@@ -75,6 +75,7 @@ module.exports = {
 				type: "number",
 				required: true
 			},
+
 			"pods": {
 				type: "number",
 				required: true
@@ -96,33 +97,24 @@ module.exports = {
 				required: true
 			},
 
-
-			options: { type: "object" },
-			createdAt: {
-				type: "number",
-				readonly: true,
-				onCreate: () => Date.now(),
-			},
-			updatedAt: {
-				type: "number",
-				readonly: true,
-				onUpdate: () => Date.now(),
-			},
-			deletedAt: {
-				type: "number",
-				readonly: true,
-				hidden: "byDefault",
-				onRemove: () => Date.now(),
-			},
+			...DbService.FIELDS,// inject dbservice fields
 		},
 
+		// default database populates
+		defaultPopulates: [],
+
+		// database scopes
 		scopes: {
-
-			// attachment the not deleted addons.attachments
-			notDeleted: { deletedAt: null }
+			...DbService.SCOPE,// inject dbservice scope
 		},
 
-		defaultScopes: ["notDeleted"]
+		// default database scope
+		defaultScopes: [...DbService.DSCOPE],// inject dbservice dscope
+
+		// default init config settings
+		config: {
+
+		}
 	},
 
 	/**
@@ -130,112 +122,190 @@ module.exports = {
 	 */
 
 	actions: {
-		getSize: {
-			description: "Add members to the addon",
-			params: {
-				name: { type: "string", optional: false },
-			},
+		...DbService.ACTIONS,// inject dbservice actions
+
+		/**
+		 * Seed the database with resourcequotas
+		 * 
+		 * @returns {Promise} - returns seeded resourcequotas
+		 */
+		seed: {
+			rest: "POST /seed",
 			async handler(ctx) {
-				const { name } = Object.assign({}, ctx.params);
-
-				let res = await this.findEntity(null, {
-					query: { name },
-				});
-				if (!res) {
-					res = await this.findEntity(ctx, {
-						query: { _id: this.decodeID(name) },
-					});
-				}
-
-				return res
+				return this.seedDB();
 			}
 		},
+
+		/**
+		 *	Find resourcequotas by name 
+		 * 
+		 * @actions
+		 * @param {String} name - resourcequota name
+		 * 
+		 * @returns {Promise} resourcequota
+		 */
+		findByName: {
+			rest: "GET /:name",
+			params: {
+				name: {
+					type: "string",
+					empty: false,
+					required: true
+				}
+			},
+			async handler(ctx) {
+				const { name } = ctx.params;
+				return this.findByName(name);
+			}
+		},
+
+		/**
+		 * Pack resourcequota entity 
+		 * 
+		 * @actions
+		 * @param {String} id - resourcequota entity id
+		 * 
+		 * @returns {Promise} - returns packed resourcequota entity
+		 */
 		pack: {
-			description: "Add members to the addon",
+			rest: "GET /:id/pack",
 			params: {
-				id: { type: "string", optional: false },
-			},
-			async handler(ctx) {
-				const params = Object.assign({}, ctx.params);
-
-				return this.resolveEntities(null, {
-					id: params.id
-				}).then((res) => this.flattenObj({
-					...res,
-					createdAt: undefined,
-					updatedAt: undefined,
-					id: undefined
-				}));
-			}
-		},
-		async seedDB() {
-			const sizes = [];
-			let memBase = 25;
-			let cpuBase = 50;
-
-			for (let i = 1; i < 15; i++) {
-
-				let cpuCount = cpuBase * i;
-				let memoryCount = memBase * i;
-				let name = `S${i}`
-				let group = 'C'
-				if (i > 9) {
-					name = `L${i - 9}`
-					group = 'A'
+				id: {
+					type: "string",
+					empty: false,
+					required: true
 				}
-				sizes.push({
-					name,
-					group,
-					"requests.cpu": Number((cpuBase * (Math.pow(i, 0.7)) * i).toFixed()),
-					"requests.memory": Number((memBase * (Math.pow(i, 0.7)) * i).toFixed()),
-					"limits.cpu": Number((cpuBase * (Math.pow(i, 0.9)) * i).toFixed()),
-					"limits.memory": Number((memBase * (Math.pow(i, 0.9)) * i).toFixed()),
-					pods: 2 * i,
-					secrets: 2 * i,
-					persistentvolumeclaims: 5 * i,
-					"requests.storage": 1024 * 10 * i,
-					"services.loadbalancers": 0,
-					"services.nodeports": 0
-				})
+			},
+			permissions: ['k8s.resourcequotas.pack'],
+			async handler(ctx) {
+				const { id } = ctx.params;
+				const entity = await this.getById(id);
+				return this.packEntity(entity);
 			}
-
-			//return sizes
-			return Promise.all(sizes.map((entity) => this.actions.create(entity)))
-		},
+		}
 	},
 
 	/**
 	 * Events
 	 */
 	events: {
+		/**
+		 * On namespace created create corresponding resourcequota
+		 */
 
+		"k8s.namespaces.created": {
+			async handler(ctx) {
+				const namespace = ctx.params;
+
+				// create resourcequota
+				return this.createResourceQuota(ctx, namespace);
+			}
+		},
+
+		/**
+		 * On namespace deleted delete corresponding resourcequota
+		 */
+		"k8s.namespaces.deleted": {
+			async handler(ctx) {
+				const namespace = ctx.params;
+
+				// delete resourcequota
+				return this.deleteResourceQuota(ctx, namespace);
+			}
+		},
 	},
 
 	/**
 	 * Methods
 	 */
 	methods: {
-		mapValues(obj) {
-			const keys = Object.keys(obj)
-			const res = {}
-			for (let index = 0; index < keys.length; index++) {
-				const key = keys[index];
-				switch (key) {
-					case 'cpu':
-						res[key] = `${obj[key]}m`
-						break;
-					case 'memory':
-					case 'storage':
-						res[key] = `${obj[key]}Mi`
-						break;
-					default:
-						res[key] = `${obj[key]}`
-						break;
-				}
-			}
 
-			return res;
+		/**
+		 * Create namedspace resource quota
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise}
+		 */
+		async createResourceQuota(ctx, namespace) {
+			const name = namespace.name;
+
+			// resource quota schema
+			const ResourceQuota = {
+				apiVersion: "v1",
+				kind: "ResourceQuota",
+				metadata: {
+					name: `${name}-resourcequota`
+				},
+				spec: {
+					hard: await ctx.call('v1.resourcequotas.pack', { id: namespace.resourcequota })
+				}
+			};
+
+			// create resource quota
+			return ctx.call('v1.kube.createNamespacedResourceQuota', {
+				namespace: name,
+				body: ResourceQuota,
+				cluster: namespace.cluster
+			});
 		},
+
+		/**
+		 * Delete namedspace resource quota
+		 * 
+		 * @param {Object} ctx - context
+		 * @param {Object} namespace - namespace entity
+		 * 
+		 * @returns {Promise}
+		 */
+		async deleteResourceQuota(ctx, namespace) {
+			const name = namespace.name;
+
+			// delete resource quota
+			return ctx.call('v1.kube.deleteNamespacedResourceQuota', {
+				namespace: name,
+				name: `${name}-resourcequota`,
+				cluster: namespace.cluster
+			});
+		},
+		/**
+		 * Get resourcequota by id
+		 * 
+		 * @param {String} id - resourcequota id
+		 * 
+		 * @requires {Promise} - returns resourcequota
+		 */
+		async getById(id) {
+			return this.actions.get({ id });
+		},
+
+		/**	
+		 * Pack resourcequota entity
+		 * 
+		 * @param {Object} entity - resourcequota entity
+		 * 
+		 * @returns {Object} - returns packed resourcequota entity
+		 */
+		async packEntity(entity) {
+
+			return this.flattenObj({
+				...entity,
+				createdAt: undefined,
+				updatedAt: undefined,
+				id: undefined
+			});
+		},
+
+		/**
+		 * Flatten resourcequota object
+		 * 
+		 * @param {Object} obj - resourcequota object
+		 * @param {String} parent - parent name
+		 * @param {Object} res - result object
+		 * 
+		 * @returns {Object} - returns flattened resourcequota object
+		 */
 		flattenObj(obj, parent, res = {}) {
 			for (let key in obj) {
 				let propName = parent ? parent + '.' + key : key;
@@ -260,7 +330,69 @@ module.exports = {
 				}
 			}
 			return res;
+		},
+
+		/**
+		 * find resourcequota by name
+		 * 
+		 * @param {String} name - resourcequota name
+		 * 
+		 * @returns {Promise} - returns resourcequota
+		 */
+		async findByName(name) {
+			return this.actions.find({ query: { name } });
+		},
+
+		/**
+		 * Seed the database with resourcequotas 
+		 * Each entity incresses limits and requests
+		 * 
+		 * @requires {Promise} - returns seeded resourcequotas
+		 */
+		async seedDB() {
+
+			// generated list of resourcequotas names
+			const names = [
+				"basic",
+				"medium",
+				"large",
+				"extra-large"
+			];
+
+			const resourcequotas = [];
+
+			//base values
+			let storageBase = 10;
+			let memBase = 25;
+			let cpuBase = 50;
+
+
+			// generated list of resourcequotas limits and requests
+			for (let index = 0; index < names.length; index++) {
+				const name = names[index];
+				// resourcequota limits and requests are base*index
+				const resourcequota = {
+					name: name,
+					"requests.cpu": cpuBase * index,
+					"requests.memory": memBase * index,
+					"requests.storage": storageBase * index,
+					"limits.cpu": cpuBase * index,
+					"limits.memory": memBase * index,
+					"pods": 10 * index,
+					"secrets": 10 * index,
+					"persistentvolumeclaims": 10 * index,
+					"services.loadbalancers": 10 * index,
+					"services.nodeports": 10 * index,
+				};
+				//create new resourcequota
+				resourcequotas.push(resourcequota);
+
+			}
+
+			// insert resourcequotas into database
+			return Promise.all(resourcequotas.map((entity) => this.actions.create(entity)))
 		}
+
 	},
 
 	/**

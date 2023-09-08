@@ -25,11 +25,11 @@
     "moleculer-repl": "^0.7.3"
   },
   "dependencies": {
-    "config-mixin": "git+https://github.com/FLYBYME/config-mixin.git",
+    "config-mixin": "git+https://github.com/PaaS-Shack/config-mixin.git",
     "cron-mixin": "git+https://github.com/PaaS-Shack/cron-mixin.git",
     "db-mixin": "git+https://github.com/PaaS-Shack/db-mixin.git",
     "generate-password": "^1.7.0",
-    "membership-mixin": "git+https://github.com/FLYBYME/membership-mixin.git",
+    "membership-mixin": "git+https://github.com/PaaS-Shack/membership-mixin.git",
     "middlewares": "git+https://github.com/PaaS-Shack/middlewares.git",
     "moleculer": "^0.14.26",
     "nats": "^2.7.1",
