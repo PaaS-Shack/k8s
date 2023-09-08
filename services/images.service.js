@@ -28,7 +28,9 @@ module.exports = {
 	 * Mixins
 	 */
 	mixins: [
-		DbService({}),
+		DbService({
+			permissions: 'k8s.images'
+		}),
 		ConfigLoader(['images.**'])
 	],
 
@@ -46,8 +48,7 @@ module.exports = {
 		rest: "/v1/k8s/images",
 
 		fields: {
-			...FIELDS.BASE_ENTITY_FIELDS.props,
-			...FIELDS.IMAGE_FIELDS.props,
+			...FIELDS.IMAGE_FIELDS.properties,
 
 			...DbService.FIELDS,// inject dbservice fields
 		},
@@ -74,8 +75,6 @@ module.exports = {
 	 */
 
 	actions: {
-		...DbService.ACTIONS,// inject dbservice actions
-
 		/**
 		 * remove all images from the database
 		 * 
@@ -223,12 +222,9 @@ module.exports = {
 				// iterate over all files
 				for (let i = 0; i < files.length; i++) {
 					const file = files[i];
-
-					// read file content
-					const content = await fs.readFile(`${dirname}/${file}`, 'utf8');
-
+					
 					// parse file content
-					const schema = JSON.parse(content);
+					const schema = require(`.${dirname}/${file}`);
 
 					// check if image exists
 					const found = await this.findEntity(null, {

@@ -145,8 +145,7 @@ module.exports = {
 	 */
 
 	actions: {
-		...DbService.FIELDS,
-		...Membership.FIELDS,
+		
 
 		clean: {
 			params: {},

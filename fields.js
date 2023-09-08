@@ -6,14 +6,14 @@
 
 const VOLUMESECRET_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         secretName: { type: 'string', empty: false, required: true },
         items: {
             type: 'array',
             items: {
                 type: 'object',
-                props: {
+                properties: {
                     key: { type: 'string', empty: false, required: true },
                     path: { type: 'string', empty: false, required: true },
                     mode: { type: 'number', min: 0, required: false },
@@ -28,14 +28,14 @@ const VOLUMESECRET_FIELDS = {
 
 const VOLUMECONFIGMAP_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         configMapName: { type: 'string', empty: false, required: true },
         items: {
             type: 'array',
             items: {
                 type: 'object',
-                props: {
+                properties: {
                     key: { type: 'string', empty: false, required: true },
                     path: { type: 'string', empty: false, required: true },
                     mode: { type: 'number', min: 0, required: false },
@@ -51,41 +51,120 @@ const VOLUMECONFIGMAP_FIELDS = {
 
 const VOLUME_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
+        // Name of the volume
         name: { type: 'string', empty: false, required: true },
+
+        // Namespace ID of the volume
+        namespace: {
+            type: 'string',
+            empty: false,
+            required: true,
+            populate: {
+                action: 'v1.k8s.namespaces.resolve'
+            }
+        },
+
+        // Deployment ID of the volume
+        deployment: {
+            type: 'string',
+            empty: false,
+            required: false,
+            populate: {
+                action: 'v1.k8s.deployments.resolve'
+            }
+        },
+
+        // Name of the underlying volume name
+        volumeName: { type: 'string', empty: false, required: false },
+
+        // Type of the volume
         type: {
             type: 'enum',
-            values: ['emptyDir', 'hostPath', 'secret', 'configMap', 'persistentVolumeClaim'],
+            values: [
+                'emptyDir',
+                'hostPath',
+                'secret',
+                'configMap',
+                'persistentVolumeClaim',
+                'persistentVolume'
+            ],
             default: 'emptyDir',
             required: true
         },
-        mountPath: { type: 'string', empty: false, required: true },
+
+        // Mount path of the volume
+        mountPath: {
+            type: 'string',
+            empty: false,
+            required: false,// a persistentVolume might not have a mount point.
+            pattern: '^(/[^/]+)+$', // starts with / and has at least one / in it
+        },
+
+        // Sub path of the volume
         subPath: { type: 'string', empty: false, default: null, required: false },
+
+        // Read only flag of the volume
         readOnly: { type: 'boolean', default: false, required: false },
-        medium: { type: 'enum', values: ['Memory'], default: 'Memory', required: false },
+
+
         secret: VOLUMESECRET_FIELDS,
         configMap: VOLUMECONFIGMAP_FIELDS,
+
+        // persistent volume config
+        persistentVolume: {
+            type: 'object',
+            properties: {
+                name: { type: 'string', empty: false, required: true },
+                type: { type: 'enum', values: ['hostPath', 'nfs', 'iscsi', 'glusterfs', 'rbd', 'cephfs', 'cinder', 'fc', 'flocker', 'flexVolume', 'azureFile', 'vsphereVolume', 'quobyte', 'azureDisk', 'portworxVolume', 'scaleIO', 'local', 'storageos', 'csi'], default: 'hostPath', required: true },
+                readOnly: { type: 'boolean', default: false, required: false },
+            }
+        },
+
+        // persistent volume claim config
         persistentVolumeClaim: {
             type: 'object',
-            props: {
+            properties: {
                 claimName: { type: 'string', empty: false, required: true },
                 readOnly: { type: 'boolean', default: false, required: false },
             }
         },
+
+        // host path volume config
         hostPath: {
             type: 'object',
-            props: {
+            properties: {
                 path: { type: 'string', empty: false, required: true },
                 type: { type: 'enum', values: ['Directory', 'File', 'Socket', 'CharDevice', 'BlockDevice'], default: 'Directory', required: false },
             }
         },
 
+        // nfs volume config
+        nfs: {
+            type: 'object',
+            properties: {
+                server: { type: 'string', empty: false, required: true },
+                path: { type: 'string', empty: false, required: true },
+                readOnly: { type: 'boolean', default: false, required: false },
+            }
+        },
+
+        // Empty dir volume
+        emptyDir: {
+            type: 'object',
+            properties: {
+                medium: { type: 'enum', values: ['Memory'], default: 'Memory', required: false },
+                sizeLimit: { type: 'number', min: 0, required: false },
+            }
+        },
+
+
     }
 };
 
-const ENV_FIELDS = {
+const ENVS_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         namespace: { type: 'string', empty: false, required: true },
         deployment: { type: 'string', empty: false, required: true },
         key: { type: 'string', empty: false, required: true },
@@ -113,12 +192,77 @@ const ENV_FIELDS = {
     }
 }
 
+const ENV_FIELDS = {
+    type: 'object',
+    properties: {
+        key: { type: 'string', empty: false, required: true },
+        value: [
+            { type: 'string', required: false },
+            { type: 'number', required: false },
+            { type: 'boolean', required: false },
+        ],
+        type: {
+            type: 'enum',
+            values: [
+                'secret', 'username', 'namespace',
+                'deployment', 'provided', 'provision',
+                'as', 'route', 'map'],
+            default: 'as',
+            required: true
+        },
+        caller: { type: "string", required: false, },
+        index: { type: "number", default: 0, required: false, },
+        scope: {
+            type: 'enum',
+            values: ['RUN_TIME', 'BUILD_TIME', 'RUN_AND_BUILD_TIME'],
+            default: 'RUN_TIME', required: false,
+        },
+    }
+}
+
+const PROBE_FIELDS = {
+    type: 'object',
+    properties: {
+        httpGet: {
+            type: 'object',
+            properties: {
+                path: { type: 'string', empty: false, required: true },
+                port: { type: 'number', min: 0, required: true },
+                scheme: { type: 'enum', values: ['HTTP', 'HTTPS'], default: 'HTTP', required: false },
+                host: { type: 'string', empty: false, required: false },
+            },
+            required: false,
+        },
+        exec: {
+            type: 'object',
+            properties: {
+                command: { type: 'array', items: { type: 'string', empty: false, required: true } }
+            },
+            required: false,
+        },
+        tcpSocket: {
+            type: 'object',
+            properties: {
+                port: { type: 'number', min: 0, required: true },
+                host: { type: 'string', empty: false, required: false },
+            },
+            required: false,
+        },
+        initialDelaySeconds: { type: 'number', min: 0, required: false },
+        timeoutSeconds: { type: 'number', min: 0, required: false },
+        periodSeconds: { type: 'number', min: 0, required: false },
+        successThreshold: { type: 'number', min: 0, required: false },
+        failureThreshold: { type: 'number', min: 0, required: false },
+    },
+    required: false
+};
+
 const PORT_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         port: { type: 'number', empty: false, required: true },
-        targetPort: { type: 'number', empty: false, required: true },
+        targetPort: { type: 'number', empty: false, required: false },
         protocol: { type: 'enum', values: ['TCP', 'UDP', 'HTTP'], default: 'TCP', required: false },
         subdomain: { type: 'string', empty: false, required: false },
         nodePort: { type: 'number', min: 0, max: 65535, required: false },
@@ -128,17 +272,18 @@ const PORT_FIELDS = {
 
 const RESOURCE_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
+        type: 'object',
         limits: {
             type: 'object',
-            props: {
+            properties: {
                 cpu: { type: 'number', min: 0, required: false },
                 memory: { type: 'number', min: 0, required: false },
             }
         },
         requests: {
             type: 'object',
-            props: {
+            properties: {
                 cpu: { type: 'number', min: 0, required: false },
                 memory: { type: 'number', min: 0, required: false },
             }
@@ -148,23 +293,23 @@ const RESOURCE_FIELDS = {
 
 const AFFINITY_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         nodeAffinity: {
             type: 'object',
-            props: {
+            properties: {
                 requiredDuringSchedulingIgnoredDuringExecution: {
                     type: 'object',
-                    props: {
+                    properties: {
                         nodeSelectorTerms: {
                             type: 'array',
                             items: {
                                 type: 'object',
-                                props: {
+                                properties: {
                                     matchExpressions: {
                                         type: 'array',
                                         items: {
                                             type: 'object',
-                                            props: {
+                                            properties: {
                                                 key: { type: 'string', empty: false, required: true },
                                                 operator: { type: 'enum', values: ['In', 'NotIn', 'Exists', 'DoesNotExist', 'Gt', 'Lt'], default: 'In', required: true },
                                                 values: { type: 'array', items: { type: 'string', empty: false, required: true } }
@@ -185,7 +330,7 @@ const LABELS_FIELDS = {
     type: 'array',
     items: {
         type: 'object',
-        props: {
+        properties: {
             key: { type: 'string', empty: false, required: true },
             value: { type: 'string', empty: false, required: true }
         }
@@ -196,7 +341,7 @@ const LABELS_FIELDS = {
 
 const SECRET_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         type: {
             type: 'enum',
@@ -210,7 +355,7 @@ const SECRET_FIELDS = {
         },
         data: {
             type: 'object',
-            props: {
+            properties: {
                 username: { type: 'string', empty: false, required: true },
                 password: { type: 'string', empty: false, required: true },
                 email: { type: 'string', empty: false, required: true },
@@ -222,11 +367,11 @@ const SECRET_FIELDS = {
 
 const CONFIGMAP_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         data: {
             type: 'object',
-            props: {
+            properties: {
                 username: { type: 'string', empty: false, required: true },
                 password: { type: 'string', empty: false, required: true },
                 email: { type: 'string', empty: false, required: true },
@@ -240,7 +385,7 @@ const TOLERATIONS_FIELDS = {
     type: 'array',
     items: {
         type: 'object',
-        props: {
+        properties: {
             key: { type: 'string', empty: false, required: true },
             operator: { type: 'enum', values: ['Equal', 'Exists'], default: 'Equal', required: true },
             value: { type: 'string', empty: false, required: true },
@@ -255,7 +400,7 @@ const PULLSECRETS_FIELDS = {
     type: 'array',
     items: {
         type: 'object',
-        props: {
+        properties: {
             name: { type: 'string', empty: false, required: true },
         }
     },
@@ -265,14 +410,14 @@ const PULLSECRETS_FIELDS = {
 
 const SECURITYCONTEXT_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         fsGroup: { type: 'number', min: 0, required: false },
         runAsGroup: { type: 'number', min: 0, required: false },
         runAsNonRoot: { type: 'boolean', default: false, required: false },
         runAsUser: { type: 'number', min: 0, required: false },
         seLinuxOptions: {
             type: 'object',
-            props: {
+            properties: {
                 level: { type: 'string', empty: false, required: true },
                 role: { type: 'string', empty: false, required: true },
                 type: { type: 'string', empty: false, required: true },
@@ -284,7 +429,7 @@ const SECURITYCONTEXT_FIELDS = {
             type: 'array',
             items: {
                 type: 'object',
-                props: {
+                properties: {
                     name: { type: 'string', empty: false, required: true },
                     value: { type: 'string', empty: false, required: true },
                 }
@@ -501,34 +646,85 @@ const exampleImage = {
     priorityClassName: null,
 }
 
+const SHORTVULUME_FIELDS = {
+    type: 'object',
+    properties: {
+        // Name of the volume
+        name: { type: 'string', empty: false, required: true },
 
+        // Type of the volume
+        type: {
+            type: 'enum',
+            values: [
+                'emptyDir',
+                'hostPath',
+                'secret',
+                'configMap',
+                'persistentVolumeClaim',
+                'persistentVolume'
+            ],
+            default: 'emptyDir',
+            required: true
+        },
+
+        // Mount path of the volume
+        mountPath: {
+            type: 'string',
+            empty: false,
+            required: false,// a persistentVolume might not have a mount point.
+            pattern: '^(/[^/]+)+$', // starts with / and has at least one / in it
+        },
+
+        // Sub path of the volume
+        subPath: { type: 'string', empty: false, default: null, required: false },
+
+        // Read only flag of the volume
+        readOnly: { type: 'boolean', default: false, required: false },
+    }
+}
 
 // Image is a predefined deployments
 const IMAGE_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         // image name
         name: { type: 'string', empty: false, required: true },
         // image namespace 
         namespace: { type: 'string', empty: false, required: true },
         // image tag (lastest)
         tag: { type: 'string', empty: false, required: true },
+        // image digest
+        digest: { type: 'string', empty: false, required: false },
         // image registry (docker.io)
         registry: { type: 'string', empty: false, required: true },
+        // image repository
+        repository: { type: 'string', empty: false, required: false },
+        // image name in string form
+        image: { type: 'string', empty: false, required: false },
         // image description
         description: { type: 'string', empty: false, required: false },
         // image pull policy (Always)
         imagePullPolicy: { type: 'enum', values: ['Always', 'Never', 'IfNotPresent'], default: 'Always', required: false },
         // ports
         ports: { type: 'array', items: PORT_FIELDS, required: false },
+        // readiness probe
+        readinessProbe: PROBE_FIELDS,
+        // liveness probe
+        livenessProbe: PROBE_FIELDS,
+
         // env
         env: { type: 'array', items: ENV_FIELDS, required: false },
         // volumes
-        volumes: { type: 'array', items: VOLUME_FIELDS, required: false },
+        volumes: { type: 'array', items: SHORTVULUME_FIELDS, required: false },
         // resources
-        resources: { type: 'object', props: RESOURCE_FIELDS, required: false },
+        resources: RESOURCE_FIELDS,
 
         args: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
+
+        config: {
+            type: 'object',
+            required: false,
+        },
 
         // lables
         labels: LABELS_FIELDS,
@@ -545,7 +741,7 @@ const IMAGE_FIELDS = {
             type: 'array',
             items: {
                 type: 'object',
-                props: {
+                properties: {
                     ip: { type: 'string', empty: false, required: true },
                     hostnames: { type: 'array', items: { type: 'string', empty: false, required: true } }
                 }
@@ -573,148 +769,9 @@ const IMAGE_FIELDS = {
 };
 
 
-const exampleDeployment = {
-    name: 'my-deployment',
-    namespace: 'my-namespace',
-    image: 'my-image',
-    replicas: 1,
-    ports: [
-        {
-            name: 'http',
-            port: 80,
-            targetPort: 8080,
-            protocol: 'TCP'
-        }
-    ],
-    env: [
-        {
-            key: 'MY_ENV',
-            value: 'my-value'
-        }
-    ],
-    volumes: [
-        {
-            name: 'my-volume',
-            type: 'emptyDir',
-            mountPath: '/my-volume',
-            subPath: '',
-            readOnly: false
-        }
-    ],
-    resources: {
-        limits: {
-            cpu: 100,//millicores
-            memory: 512// mb
-        },
-        requests: {
-            cpu: 100,//millicores
-            memory: 512// mb
-        }
-    },
-    labels: [
-        {
-            key: 'app',
-            value: 'my-app'
-        }
-    ],
-    annotations: [
-        {
-            key: 'app',
-            value: 'my-app'
-        }
-    ],
-    nodeSelector: [
-        {
-            key: 'app',
-            value: 'my-app'
-        }
-    ],
-    affinity: {
-        nodeAffinity: {
-            requiredDuringSchedulingIgnoredDuringExecution: {
-                nodeSelectorTerms: [
-                    {
-                        matchExpressions: [
-                            {
-                                key: 'app',
-                                operator: 'In',
-                                values: [
-                                    'my-app'
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-    },
-    tolerations: [
-        {
-            key: 'app',
-            operator: 'Equal',
-            value: 'my-app',
-            effect: 'NoSchedule'
-        }
-    ],
-    imagePullSecrets: [
-        {
-            name: 'my-secret'
-        }
-    ],
-    securityContext: {
-        fsGroup: 1000,
-        runAsGroup: 1000,
-        runAsNonRoot: true,
-        runAsUser: 1000,
-        seLinuxOptions: {
-            level: 's0:c123,c456',
-            role: 'Role',
-            type: 'Type',
-        },
-        supplementalGroups: [
-            1000,
-            2000
-        ],
-        sysctls: [
-            {
-                name: 'net.core.somaxconn',
-                value: '1024'
-            }
-        ],
-        add: [
-            'ALL',
-            'AUDIT_CONTROL',
-            'AUDIT_WRITE'
-        ],
-        drop: [
-            'ALL',
-            'AUDIT_CONTROL',
-            'AUDIT_WRITE'
-        ]
-    },
-    terminationGracePeriodSeconds: 30,
-    dnsPolicy: 'ClusterFirst',
-    restartPolicy: 'Always',
-    hostAliases: [
-        {
-            ip: '10.0.0.1',
-            hostnames: [
-                'my-hostname'
-            ]
-        }
-    ],
-    hostNetwork: false,
-    hostPID: false,
-    hostIPC: false,
-    shareProcessNamespace: false,
-    serviceAccountName: 'my-service-account',
-    schedulerName: 'my-scheduler',
-    priorityClassName: 'my-priority-class',
-};
-
 const DEPLOYMENT_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         // deployment name
         name: { type: 'string', empty: false, required: true },
         // deployment namespace id
@@ -734,15 +791,18 @@ const DEPLOYMENT_FIELDS = {
         // deployment replicas (1)
         replicas: { type: 'number', default: 1, min: 0, max: 10, required: false },
         // deployment ports. can be used to open abatrairy ports outside of image ports
-        ports: { type: 'array', items: PORT_FIELDS, default: [], required: false },
-        // deployment env. can be used to set env variables
-        env: { type: 'array', items: ENV_FIELDS, default: [], required: false },
-        // deployment volumes. can be used to mount volumes that are shared between containers
-        volumes: { type: 'array', items: VOLUME_FIELDS, default: [], required: false },
-        // deployment resources limits and requests
-        resources: { type: 'object', props: RESOURCE_FIELDS, required: false },
-        // deployment args (command line arguments)
-        args: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
+        ports: { type: 'array', items: PORT_FIELDS, required: false },
+        // readiness probe
+        readinessProbe: PROBE_FIELDS,
+        // liveness probe
+        livenessProbe: PROBE_FIELDS,
+
+        // env
+        env: { type: 'array', items: ENV_FIELDS, required: false },
+        // volumes
+        volumes: { type: 'array', items: SHORTVULUME_FIELDS, required: false },
+        // resources
+        resources: RESOURCE_FIELDS,
 
         //lables
         labels: LABELS_FIELDS,
@@ -761,7 +821,7 @@ const DEPLOYMENT_FIELDS = {
             type: 'array',
             items: {
                 type: 'object',
-                props: {
+                properties: {
                     ip: { type: 'string', empty: false, required: true },
                     hostnames: { type: 'array', items: { type: 'string', empty: false, required: true } }
                 }
@@ -813,7 +873,7 @@ const exampleService = {
 
 const SERVICE_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         type: { type: 'enum', values: ['ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName'], default: 'ClusterIP', required: false },
         ports: { type: 'array', items: PORT_FIELDS, required: false },
@@ -832,7 +892,7 @@ const SERVICE_FIELDS = {
 
 const INGRESS_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         host: { type: 'string', empty: false, required: true },
         path: { type: 'string', empty: false, required: true },
@@ -840,7 +900,7 @@ const INGRESS_FIELDS = {
         servicePort: { type: 'number', min: 0, max: 65535, required: true },
         tls: {
             type: 'object',
-            props: {
+            properties: {
                 secretName: { type: 'string', empty: false, required: true },
                 hosts: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
             }
@@ -850,19 +910,19 @@ const INGRESS_FIELDS = {
 
 const PERSISTENTVOLUME_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         type: { type: 'enum', values: ['hostPath', 'nfs', 'iscsi', 'glusterfs', 'rbd', 'cephfs', 'cinder', 'fc', 'flocker', 'flexVolume', 'azureFile', 'vsphereVolume', 'quobyte', 'azureDisk', 'portworxVolume', 'scaleIO', 'local', 'storageos', 'csi'], default: 'hostPath', required: true },
         hostPath: {
             type: 'object',
-            props: {
+            properties: {
                 path: { type: 'string', empty: false, required: true },
                 type: { type: 'enum', values: ['Directory', 'File', 'Socket', 'CharDevice', 'BlockDevice'], default: 'Directory', required: false },
             }
         },
         nfs: {
             type: 'object',
-            props: {
+            properties: {
                 server: { type: 'string', empty: false, required: true },
                 path: { type: 'string', empty: false, required: true },
                 readOnly: { type: 'boolean', default: false, required: false },
@@ -873,16 +933,16 @@ const PERSISTENTVOLUME_FIELDS = {
 
 const PERSISTENTVOLUMECLAIM_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         storageClassName: { type: 'string', empty: false, required: true },
         accessModes: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
         resources: {
             type: 'object',
-            props: {
+            properties: {
                 requests: {
                     type: 'object',
-                    props: {
+                    properties: {
                         storage: { type: 'string', empty: false, required: true },
                     }
                 }
@@ -893,7 +953,7 @@ const PERSISTENTVOLUMECLAIM_FIELDS = {
 
 const STORAGECLASS_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         provisioner: { type: 'string', empty: false, required: true },
         parameters: { type: 'object', required: false },
@@ -906,7 +966,7 @@ const STORAGECLASS_FIELDS = {
 
 const NAMESPACE_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         labels: LABELS_FIELDS,
         annotations: LABELS_FIELDS,
@@ -915,13 +975,13 @@ const NAMESPACE_FIELDS = {
 
 const ROLE_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         rules: {
             type: 'array',
             items: {
                 type: 'object',
-                props: {
+                properties: {
                     apiGroups: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
                     resources: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
                     verbs: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
@@ -935,11 +995,11 @@ const ROLE_FIELDS = {
 
 const ROLEBINDING_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         roleRef: {
             type: 'object',
-            props: {
+            properties: {
                 apiGroup: { type: 'string', empty: false, required: true },
                 kind: { type: 'string', empty: false, required: true },
                 name: { type: 'string', empty: false, required: true },
@@ -949,7 +1009,7 @@ const ROLEBINDING_FIELDS = {
             type: 'array',
             items: {
                 type: 'object',
-                props: {
+                properties: {
                     kind: { type: 'string', empty: false, required: true },
                     name: { type: 'string', empty: false, required: true },
                     namespace: { type: 'string', empty: false, required: true },
@@ -962,7 +1022,7 @@ const ROLEBINDING_FIELDS = {
 
 const BASE_ENTITY_FIELDS = {
     type: 'object',
-    props: {
+    properties: {
         name: { type: 'string', empty: false, required: true },
         labels: LABELS_FIELDS,
         annotations: LABELS_FIELDS,
@@ -992,4 +1052,8 @@ module.exports = {
     PULLSECRETS_FIELDS,
     SECURITYCONTEXT_FIELDS,
     BASE_ENTITY_FIELDS,
+    SHORTVULUME_FIELDS,
+    PROBE_FIELDS,
+    ENVS_FIELDS,
+
 };

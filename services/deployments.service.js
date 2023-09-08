@@ -22,6 +22,7 @@ const FIELDS = require('../fields');
  */
 
 
+
 module.exports = {
 	// name of service
 	name: "k8s.deployments",
@@ -63,7 +64,7 @@ module.exports = {
 
 		fields: {
 
-			...FIELDS.DEPLOYMENT_FIELDS.props,
+			...FIELDS.DEPLOYMENT_FIELDS.properties,
 
 
 			...DbService.FIELDS,// inject dbservice fields
@@ -96,7 +97,7 @@ module.exports = {
 	 */
 	actions: {
 		...Membership.ACTIONS,// inject membership actions
-		...DbService.ACTIONS,// inject dbservice actions
+		//...DbService.ACTIONS,// inject dbservice actions
 
 
 	},
@@ -842,7 +843,11 @@ module.exports = {
 			// return the metadata
 			return metadata;
 		}
+	},
+	created() {
+
 	}
+
 
 }
 

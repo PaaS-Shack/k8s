@@ -122,7 +122,6 @@ module.exports = {
 	 */
 
 	actions: {
-		...DbService.ACTIONS,// inject dbservice actions
 
 		/**
 		 * Seed the database with resourcequotas

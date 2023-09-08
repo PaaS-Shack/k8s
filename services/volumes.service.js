@@ -8,6 +8,8 @@ const Membership = require("membership-mixin");
 
 const { MoleculerClientError } = require("moleculer").Errors;
 
+const FIELDS = require("../fields");
+
 /**
  * Kubernetes volumes and persistent volumes service
  */
@@ -52,104 +54,8 @@ module.exports = {
 		rest: "/v1/k8s/volumes/", //  Rest api path
 
 		fields: {// db fields for volume
-			// volume name
-			name: {
-				type: "string",
-				empty: false,
-				required: true
-			},
 
-			// volume namespace
-			namespace: {
-				type: "string",
-				empty: false,
-				required: true,
-				populate: {
-					action: "v1.k8s.namespaces.resolve",
-				}
-			},
-
-			// volume deployment
-			deployment: {
-				type: "string",
-				empty: false,
-				required: false,
-				populate: {
-					action: "v1.k8s.deployments.resolve",
-				}
-			},
-
-			// volume type
-			type: {
-				type: "string",
-				enum: ["pvc", "pv"],
-				empty: false,
-				required: true
-			},
-
-			// volume size
-			size: {
-				type: "number",
-				required: true
-			},
-
-			// volume storage class
-			storageClass: {
-				type: "string",
-				enum: [
-					"local",
-					"shared",
-					"replica",
-				],
-				default: "shared",
-				empty: false,
-				required: true
-			},
-
-			// volume access mode
-			accessMode: {
-				type: "string",
-				enum: ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"],
-				default: "ReadWriteOnce",
-				empty: false,
-				required: true
-			},
-
-			// volume reclaim policy
-			reclaimPolicy: {
-				type: "string",
-				enum: ["Retain", "Delete"],
-				default: "Delete",
-				empty: false,
-				required: true
-			},
-
-			// volume status
-			status: {
-				type: "string",
-				enum: ["Creating", "Available", "Bound", "Released", "Failed"],
-				default: "Creating",
-				empty: false,
-				required: true
-			},
-
-			// volume mount path
-			mountPath: {
-				type: "string",
-				empty: false,
-				required: true
-			},
-
-			// volume shared
-			shared: {
-				type: "boolean",
-				required: false,
-				default: false
-			},
-
-
-
-
+			...FIELDS.VOLUME_FIELDS.props,
 
 			...DbService.FIELDS,// inject dbservice fields
 			...Membership.FIELDS,// inject membership fields
@@ -169,8 +75,7 @@ module.exports = {
 	 */
 
 	actions: {
-		...DbService.FIELDS,
-		...Membership.FIELDS,
+		
 	},
 
 	/**
@@ -191,19 +96,19 @@ module.exports = {
 				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 					id: volume.namespace,
 				});
-
 				//resolve deployment
-				const deployment = volume.deployment ? await ctx.call('v1.k8s.deployments.resolve', {
+				const deployment = volume.deployment && await ctx.call('v1.k8s.deployments.resolve', {
 					id: volume.deployment,
-				}) : undefined;
+				});
 
-
-				// create volume
-				if (volume.type == "pvc") {
-					await this.createPVC(ctx, namespace, volume, deployment);
-				} else if (volume.type == "pv") {
-					await this.createPV(ctx, namespace, volume, deployment);
+				if (volume.type == 'persistentVolumeClaim') {
+					// create pvc
+					const createdPVC = await this.createPVC(ctx, namespace, volume, deployment);
+				} else if (volume.type == 'persistentVolume') {
+					// create pv
+					const createdPV = await this.createPV(ctx, namespace, volume, deployment);
 				}
+
 
 			}
 		},
@@ -236,40 +141,25 @@ module.exports = {
 					name: deployment.image,
 				});
 
+
 				// loop image volumes
 				for (const volume of image.volumes) {
 					// create volume
-					const createdVolume = await ctx.call('v1.k8s.volumes.create', {
-						name: volume.name,
+					const createdVolume = await this.createEntity(ctx, {
 						namespace: namespace.id,
 						deployment: deployment?.id,
-						type: volume.type,
-						size: volume.size,
-						storageClass: volume.storageClass,
-						accessMode: volume.accessMode,
-						reclaimPolicy: volume.reclaimPolicy,
-						status: volume.status,
-						mountPath: volume.mountPath,
-						shared: volume.shared,
-					});
+						...volume,
+					}, { permissive: true });
 				}
 
 				// loop deployment volumes
 				for (const volume of deployment.volumes) {
 					// create volume
-					const createdVolume = await ctx.call('v1.k8s.volumes.create', {
-						name: volume.name,
+					const createdVolume = await this.createEntity(ctx, {
 						namespace: namespace.id,
 						deployment: deployment?.id,
-						type: volume.type,
-						size: volume.size,
-						storageClass: volume.storageClass,
-						accessMode: volume.accessMode,
-						reclaimPolicy: volume.reclaimPolicy,
-						status: volume.status,
-						mountPath: volume.mountPath,
-						shared: volume.shared,
-					});
+						...volume,
+					}, { permissive: true });
 				}
 
 			}
@@ -280,7 +170,8 @@ module.exports = {
 		 */
 		"k8s.deployments.deleted": {
 			async handler(ctx) {
-				const deployment = ctx.params;
+				// Create a new deployment object
+
 
 			}
 		},
@@ -290,6 +181,169 @@ module.exports = {
 	 * Methods
 	 */
 	methods: {
+		/**
+		 * Create emptyDir volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} volume - volume object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise}
+		 */
+		async createEmptyDir(ctx, namespace, volume, deployment) {
+			const volumeName = volume.volumeName;
+
+			const EmptyDirVolumeSource = {
+				medium: volume.emptyDir.medium,
+				sizeLimit: volume.emptyDir.sizeLimit,
+			}
+
+			const Volume = {
+				name: volumeName,
+				emptyDir: EmptyDirVolumeSource
+			}
+
+			return Volume;
+		},
+
+		/**
+		 * Delete emptyDir volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} volume - volume object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise}
+		 */
+		async deleteEmptyDir(ctx, namespace, volume, deployment) {
+			
+		},
+
+		/**
+		 * Create hostPath volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} volume - volume object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise}
+		 */
+		async createHostPath(ctx, namespace, volume, deployment) {
+			const volumeName = volume.volumeName;
+
+			const HostPathVolumeSource = {
+				path: volume.path,
+				type: volume.type,
+			}
+
+			const Volume = {
+				name: volumeName,
+				hostPath: HostPathVolumeSource
+			}
+
+			return Volume;
+		},
+
+		/**
+		 * Delete hostPath volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} volume - volume object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise}
+		 */
+		async deleteHostPath(ctx, namespace, volume, deployment) {
+
+		},
+
+		/**
+		 * Create configMap volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} volume - volume object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise}
+		 */
+		async createConfigMap(ctx, namespace, volume, deployment) {
+			const volumeName = volume.volumeName;
+
+			const ConfigMapVolumeSource = {
+				name: volume.name,
+				items: volume.items,
+				defaultMode: volume.defaultMode,
+				optional: volume.optional,
+			}
+
+			const Volume = {
+				name: volumeName,
+				configMap: ConfigMapVolumeSource
+			}
+
+			return Volume;
+		},
+
+		/**
+		 * Delete configMap volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} volume - volume object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise}
+		 */
+		async deleteConfigMap(ctx, namespace, volume, deployment) {
+
+		},
+
+		/**
+		 * Create secret volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} volume - volume object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise}
+		 */
+		async createSecret(ctx, namespace, volume, deployment) {
+			const volumeName = volume.volumeName;
+
+			const SecretVolumeSource = {
+				secretName: volume.name,
+				items: volume.items,
+				defaultMode: volume.defaultMode,
+				optional: volume.optional,
+			}
+
+			const Volume = {
+				name: volumeName,
+				secret: SecretVolumeSource
+			}
+
+			return Volume;
+		},
+
+		/**
+		 * Delete secret volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} volume - volume object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise}
+		 */
+		async deleteSecret(ctx, namespace, volume, deployment) {
+
+		},
 
 		/**
 		 * Create PVC volume

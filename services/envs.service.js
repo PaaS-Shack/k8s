@@ -44,7 +44,7 @@ module.exports = {
 
 		fields: {
 
-			...FIELDS.ENV_FIELDS.props,// inject env fields
+			...FIELDS.ENVS_FIELDS.properties,// inject env fields
 
 
 			...DbService.FIELDS,// inject dbservice fields
@@ -73,64 +73,6 @@ module.exports = {
 
 	actions: {
 
-		/**
-		 * List all entities with pagination.
-		 * 
-		 * @actions
-		 * @param {String} deployment - Deployment id
-		 * @param {String} namespace - Namespace id
-		 * 
-		 * @return {Promise} List of entities
-		 */
-		list: {
-			permissions: ['k8s.envs.list'],
-			params: {
-				deployment: { type: "string", min: 3, optional: false },
-				namespace: { type: "string", min: 3, optional: false }
-			}
-		},
-
-		/**
-		 * Find an entity by query
-		 * 
-		 * @actions
-		 * @param {String} deployment - Deployment id
-		 * @param {String} namespace - Namespace id
-		 * 
-		 * @return {Promise} Found entities
-		 */
-		find: {
-			rest: "GET /find",
-			permissions: ['k8s.envs.find'],
-		},
-
-		/**
-		 * Count entities by query
-		 * 
-		 * @actions
-		 * @param {String} deployment - Deployment id
-		 * @param {String} namespace - Namespace id
-		 * 
-		 * @return {Promise} Entities count
-		 */
-		count: {
-			rest: "GET /count",
-			permissions: ['k8s.envs.count'],
-			params: {
-				deployment: { type: "string", min: 3, optional: false },
-				namespace: { type: "string", min: 3, optional: false }
-			}
-		},
-
-		get: {
-			needEntity: true,
-			permissions: ['k8s.envs.get']
-		},
-		update: {
-			needEntity: true,
-			permissions: ['k8s.envs.update']
-		},
-		replace: false,
 
 
 		/**
@@ -150,7 +92,7 @@ module.exports = {
 		 */
 		create: {
 			params: {
-				...C.env.props,
+				...FIELDS.ENV_FIELDS.props,
 				called: { type: "boolean", optional: true, default: false },
 				deployment: { type: "string", min: 3, optional: false },
 				namespace: { type: "string", min: 3, optional: false }
@@ -248,7 +190,7 @@ module.exports = {
 					const vHost = deployment.vHosts[0];
 
 					// filter out http routes
-					const routePorts = image.ports.filter((p) => p.type == 'http' || p.type == 'https')
+					const routePorts = image.ports.filter((p) => p.type == 'HTTP')
 
 					//get subdomain
 					const { subdomain } = routePorts[params.index];
