@@ -117,14 +117,223 @@ module.exports = {
 				id: { type: "string", optional: false },
 			},
 			async handler(ctx) {
-				const deployment = await this.resolveEntities(ctx, { id: ctx.params.id });
-				const options = { meta: { userID: deployment.owner } };
-				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace }, options);
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
 				return await this.createDeploymentSchema(ctx, namespace, deployment, image);//.then((resource) => resource.spec.template.spec);
 			}
-		}
+		},
+
+		/**
+		 * Get namespace status
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment status
+		 */
+		status: {
+			rest: {
+				method: "GET",
+				path: "/:id/status"
+			},
+			permissions: ['k8s.deployments.status'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace },);
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+				const resource = await ctx.call("v1.kube.readNamespacedDeployment", {
+					name: deployment.name,
+					namespace: namespace.name,
+					cluster: namespace.cluster,
+				});
+
+				return resource.status;
+			}
+		},
+
+		/**
+		 * Get deployment logs
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment logs
+		 */
+		logs: {
+			rest: {
+				method: "GET",
+				path: "/:id/logs"
+			},
+			permissions: ['k8s.deployments.logs'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+
+				const query = {
+					kind: 'Pod',
+					'metadata.namespace': namespace.name,
+					fields: ['metadata.name', 'metadata.namespace', 'metadata.labels', 'metadata.uid'],
+				}
+
+				// deploymant lables
+				const labales = await this.generateDeploymentLabels(ctx, namespace, deployment, image);
+
+				// add the lables to the query
+				for (const key in labales) {
+					query[`metadata.labels.${key}`] = labales[key];
+				}
+
+				const Pod = await ctx.call('v1.kube.findOne', query);
+				console.log(Pod)
+
+				return ctx.call('v1.kube.logs', {
+					name: Pod.metadata.name,
+					namespace: Pod.metadata.namespace,
+					cluster: namespace.cluster
+				}).then((res) => {
+					return res.join('').split('\n')
+				})
+			}
+		},
+
+		/**
+		 * Get deployment events
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment events
+		 */
+		events: {
+			rest: {
+				method: "GET",
+				path: "/:id/events"
+			},
+			permissions: ['k8s.deployments.events'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+				const query = {
+					kind: 'Event',
+					'metadata.namespace': namespace.name,
+					'metadata.involvedObject.uid': deployment.uid,
+				}
+
+				return ctx.call('v1.kube.find', query);
+
+			}
+		},
+
+		/**
+		 * Get deployment pods
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment pods
+		 */
+		pods: {
+			rest: {
+				method: "GET",
+				path: "/:id/pods"
+			},
+			permissions: ['k8s.deployments.pods'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+
+				const query = {
+					kind: 'Pod',
+					'metadata.namespace': namespace.name,
+				}
+
+				// deploymant lables
+				const labales = await this.generateDeploymentLabels(ctx, namespace, deployment, image);
+
+				// add the lables to the query
+				for (const key in labales) {
+					query[`metadata.labels.${key}`] = labales[key];
+				}
+
+				return ctx.call('v1.kube.find', query);
+			}
+		},
+
+		/**
+		 * Scale a deployment up or down
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * @param {Number} replicas - number of replicas
+		 * 
+		 * @returns {Promise} deployment pods
+		 */
+		scale: {
+			rest: {
+				method: "POST",
+				path: "/:id/scale"
+			},
+			permissions: ['k8s.deployments.scale'],
+			params: {
+				id: { type: "string", optional: false },
+				replicas: { type: "number", min: 0, max: 100, optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+				return ctx.call('v1.kube.patchNamespacedDeployment', {
+					name: deployment.name,
+					namespace: namespace.name,
+					cluster: namespace.cluster,
+					body: {
+						spec: {
+							replicas: params.replicas
+						}
+					}
+				});
+			}
+		},
 	},
 
 	/**
