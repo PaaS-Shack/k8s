@@ -958,6 +958,13 @@ const NAMESPACE_FIELDS = {
             immutable: true,
         },
 
+        cluster: {
+            type: 'string',
+            required: false,
+            immutable: true,
+            default: 'default',
+        },
+
         labels: LABELS_FIELDS,
         annotations: LABELS_FIELDS,
 

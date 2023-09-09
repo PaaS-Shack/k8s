@@ -43,7 +43,7 @@ module.exports = {
 			...DbService.FIELDS,// inject dbservice fields
 			...Membership.FIELDS,// inject membership fields
 		},
-		defaultPopulates: ['quota', 'status'],
+		defaultPopulates: [],
 
 		scopes: {
 			...DbService.SCOPE,
@@ -86,6 +86,102 @@ module.exports = {
 				return namespace
 			}
 		},
+
+		/**
+		 * Get namespace status
+		 * 
+		 * @actions
+		 * @param {String} id - namespace id
+		 * 
+		 * @returns {Promise} namespace status
+		 */
+		status: {
+			rest: {
+				method: "GET",
+				path: "/:id/status"
+			},
+			permissions: ['k8s.namespaces.status'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				// resolve namespace
+				const namespace = await this.resolveEntities(ctx, {
+					id: params.id,
+					fields: ['id', 'name', 'uid', 'cluster']
+				});
+
+				if (namespace.uid == null) {
+
+					// get namespace status
+					const resource = await ctx.call("v1.kube.readNamespace", {
+						name: namespace.name,
+						cluster: namespace.cluster
+					});
+
+					return this.transformResource(ctx, resource);
+				}
+
+				// lookup namespace uid with v1.kube.findOne
+				const resource = await ctx.call("v1.kube.findOne", {
+					_id: namespace.uid,
+					fields: ['spec', 'status']
+				});
+
+				return this.transformResource(ctx, resource);
+			}
+		},
+
+		/**
+		 * Get namespace resourcequota
+		 * 
+		 * @actions
+		 * @param {String} id - namespace id
+		 * 
+		 * @returns {Promise} namespace resourcequota
+		 */
+		resourcequota: {
+			rest: {
+				method: "GET",
+				path: "/:id/resourcequota"
+			},
+			permissions: ['k8s.namespaces.resourcequota'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				// resolve namespace
+				const namespace = await this.resolveEntities(ctx, {
+					id: params.id,
+					fields: ['id', 'name', 'uid', 'cluster']
+				});
+
+				if (namespace.uid == null) {
+
+					// get namespace resourcequota
+					const resource = await ctx.call("v1.kube.readNamespacedResourceQuota", {
+						name: `${namespace.name}-resourcequota`,
+						namespace: namespace.name,
+						cluster: namespace.cluster
+					});
+
+					return this.transformResource(ctx, resource);
+				}
+
+				// lookup namespace uid with v1.kube.findOne
+				const resource = await ctx.call("v1.kube.findOne", {
+					_id: namespace.uid,
+					fields: ['spec', 'status']
+				});
+
+				return this.transformResource(ctx, resource);
+			}
+		},
+
 	},
 
 	/**
@@ -94,55 +190,46 @@ module.exports = {
 	events: {
 		async "k8s.namespaces.created"(ctx) {
 			const namespace = ctx.params.data;
-
-			this.logger.info(`Creating namespace ${namespace.name} on cluster ${namespace.cluster}`);
-			await this.createNamespace(ctx, namespace);
+			return this.createNamespace(ctx, namespace)
+				.then((resource) => {
+					this.logger.info(`Creating namespace ${namespace.name} on cluster ${namespace.cluster} with uid ${resource.metadata.uid}`);
+				})
+				.catch((err) => {
+					this.logger.error(`Creating namespace ${namespace.name} on cluster ${namespace.cluster} failed with error ${err.message}`);
+				});
 
 		},
 		async "k8s.namespaces.removed"(ctx) {
 			const namespace = ctx.params.data;
-
-			this.logger.info(`Deleting namespace ${namespace.name} on cluster ${namespace.cluster}`);
-			await this.deleteNamespace(ctx, namespace);
+			return this.deleteNamespace(ctx, namespace)
+				.then((resource) => {
+					this.logger.info(`Deleting namespace ${namespace.name} on cluster ${namespace.cluster} with uid ${resource.metadata.uid}`);
+				}).catch((err) => {
+					this.logger.error(`Deleting namespace ${namespace.name} on cluster ${namespace.cluster} failed with error ${err.message}`);
+				});
 
 		},
 		async "kube.namespaces.added"(ctx) {
 			const resource = ctx.params;
 			// k8s resource watcher will trigger this event
-
-			//if no annotation, ignore
-			if (!resource.metadata.annotations)
-				return;
-
-			// namespace id is stored in annotation
-			const id = resource.metadata.annotations['k8s.one-host.ca/id'];
-
-			// if no id, ignore
-			if (!id)
-				return;
-
-			// find namespace by id	
-			await this.updateUid(ctx, { id }, resource.metadata.uid);
-			this.logger.info(`Kube has created namespace ${resource.metadata.name} on cluster ${resource.metadata.cluster} ${resource.metadata.uid}`)
-
+			return this.getIdFromAnnotation(ctx, resource)
+				.then(async (id) => {
+					await this.updateUid(ctx, { id }, resource.metadata.uid);
+					this.logger.info(`Kube has created namespace ${resource.metadata.name} on cluster ${resource.metadata.cluster} ${resource.metadata.uid}`);
+				}).catch((err) => {
+					this.logger.error(`Kube has created namespace ${resource.metadata.name} on cluster ${resource.metadata.cluster} failed with error ${err.message}`);
+				});
 		},
 		async "kube.namespaces.deleted"(ctx) {
 			const resource = ctx.params;
 			// k8s resource watcher will trigger this event
-
-			//if no annotation, ignore
-			if (!resource.metadata.annotations)
-				return;
-
-			// namespace id is stored in annotation
-			const id = resource.metadata.annotations['k8s.one-host.ca/id'];
-
-			// if no id, ignore
-			if (!id)
-				return;
-
-			await this.updateUid(ctx, { id }, null);
-			this.logger.info(`Kube has deleted namespace ${resource.metadata.name} on cluster ${resource.metadata.cluster} ${resource.metadata.uid}`)
+			return this.getIdFromAnnotation(ctx, resource)
+				.then(async (id) => {
+					await this.updateUid(ctx, { id }, null);
+					this.logger.info(`Kube has deleted namespace ${resource.metadata.name} on cluster ${resource.metadata.cluster} ${resource.metadata.uid}`)
+				}).catch((err) => {
+					this.logger.error(err.message)
+				});
 		},
 	},
 
@@ -150,6 +237,43 @@ module.exports = {
 	 * Methods
 	 */
 	methods: {
+		/**
+		 * Transform resource to spec and status
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} resource
+		 */
+		async transformResource(ctx, resource) {
+			return {
+				spec: resource.spec,
+				status: resource.status,
+			};
+		},
+
+		/**
+		 * Get ID from annotation
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise} 
+		 */
+		async getIdFromAnnotation(ctx, namespace) {
+			const annotations = namespace.metadata.annotations;
+			return new Promise((resolve, reject) => {
+				// if no annotations, ignore
+				if (!annotations)
+					throw new MoleculerClientError("No annotations found", 400, "NO_ANNOTATIONS");
+
+				// if no id, ignore
+				if (!annotations['k8s.one-host.ca/id'])
+					throw new MoleculerClientError("No id found", 400, "NO_ID");
+
+				resolve(annotations['k8s.one-host.ca/id']);
+			});
+
+		},
+
 		/**
 		 * Create k8s namespace
 		 * 
