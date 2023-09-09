@@ -122,7 +122,7 @@ module.exports = {
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace }, options);
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
-				return await this.createDeploymentSchema(ctx, namespace, deployment, image);
+				return await this.createDeploymentSchema(ctx, namespace, deployment, image);//.then((resource) => resource.spec.template.spec);
 			}
 		}
 	},
@@ -291,10 +291,20 @@ module.exports = {
 			const dnsPolicy = await this.generateDnsPolicySpec(ctx, namespace, deployment, image);
 			// pod volumes
 			const volumes = await this.generateVolumesSpec(ctx, namespace, deployment, image);
+			// deployment strategy
+			const strategy = await this.generateDeploymentStrategySpec(ctx, namespace, deployment, image);
+			// deployment revision history limit
+			const revisionHistoryLimit = deployment.revisionHistoryLimit || image.revisionHistoryLimit;
+			// deployment progress deadline seconds
+			const progressDeadlineSeconds = deployment.progressDeadlineSeconds || image.progressDeadlineSeconds;
+
 
 			// create a spec
 			const spec = {
 				replicas: deployment.replicas,
+				strategy,
+				revisionHistoryLimit,
+				progressDeadlineSeconds,
 				selector: {
 					matchLabels: labels
 				},
@@ -322,6 +332,32 @@ module.exports = {
 		},
 
 		/**
+		 * deployment strategy spec
+		 * 
+		 * @param {Object} ctx - context
+		 * @param {Object} namespace - namespace Object
+		 * @param {Object} deployment - deployment object
+		 * @param {Object} image - image object
+		 * 
+		 * @returns {Object} spec
+		 */
+		async generateDeploymentStrategySpec(ctx, namespace, deployment, image) {
+			// create a deployment strategy spec
+
+			const strategy = {
+				type: deployment.strategy.type,
+				rollingUpdate: {
+					maxSurge: deployment.strategy.rollingUpdate.maxSurge,
+					maxUnavailable: deployment.strategy.rollingUpdate.maxUnavailable
+				}
+			};
+
+			// return the strategy
+			return strategy;
+		},
+
+
+		/**
 		 * generate a conainter lables spec
 		 * 
 		 * @param {Object} ctx - context
@@ -338,17 +374,16 @@ module.exports = {
 				app: deployment.name,
 			};
 
-
 			// loop over image labels
 			for (const label of image.labels) {
 				// add the label to the labels
-				labels[label.name] = label.value;
+				labels[label.key] = label.value;
 			}
 
 			// loop over deployment labales
 			for (const label of deployment.labels) {
 				// add the label to the labels
-				labels[label.name] = label.value;
+				labels[label.key] = label.value;
 			}
 
 			// return the labels
@@ -369,23 +404,25 @@ module.exports = {
 			// create a deployment annotations spec
 
 			const annotations = {
-				'k8s.one-host.ca/owner': deployment.owner.id,
+				'k8s.one-host.ca/owner': deployment.owner,
 				'k8s.one-host.ca/namespace': namespace.id,
 				'k8s.one-host.ca/deployment': deployment.id,
-				'k8s.one-host.ca/build': deployment.build?.id,
-				'k8s.one-host.ca/image': deployment.image.id,
+				'k8s.one-host.ca/image': deployment.image,
 			};
+			if (deployment.build) {
+				annotations['k8s.one-host.ca/build'] = deployment.build;
+			}
 
 			// loop over image annotations
 			for (const annotation of image.annotations) {
 				// add the annotation to the annotations
-				annotations[annotation.name] = annotation.value;
+				annotations[annotation.key] = annotation.value;
 			}
 
 			// loop over deployment annotations
 			for (const annotation of deployment.annotations) {
 				// add the annotation to the annotations
-				annotations[annotation.name] = annotation.value;
+				annotations[annotation.key] = annotation.value;
 			}
 
 			// return the annotations
@@ -538,8 +575,8 @@ module.exports = {
 				return securityContext;
 			}
 
-			// return undefined
-			return undefined;
+			// return empty
+			return {};
 		},
 
 		/**
@@ -577,18 +614,23 @@ module.exports = {
 			//merge image and deployment volumes. deployment volumes take presedent over image volumes
 			const volumes = [];
 
-			// loop over deployment volumes
-			for (const volume of deployment.volumes) {
-				// add the volume to the volumes
-				volumes.push(await this.generateVolumeSpec(ctx, namespace, deployment, image, volume));
-			}
-			// loop over image volumes dont override deployment
-			for (const volume of image.volumes) {
-				// add the volume to the volumes
-				if (volumes.find(v => v.name == volume.name)) {
-					continue;
+			if (deployment.volumes) {
+				// loop over deployment volumes
+				for (const volume of deployment.volumes) {
+					// add the volume to the volumes
+					volumes.push(await this.generateVolumeSpec(ctx, namespace, deployment, image, volume));
 				}
-				volumes.push(await this.generateVolumeSpec(ctx, namespace, deployment, image, volume));
+			}
+
+			if (image.volumes) {
+				// loop over image volumes dont override deployment
+				for (const volume of image.volumes) {
+					// add the volume to the volumes
+					if (volumes.find(v => v.name == volume.name)) {
+						continue;
+					}
+					volumes.push(await this.generateVolumeSpec(ctx, namespace, deployment, image, volume));
+				}
 			}
 
 			// return the volumes
@@ -635,9 +677,15 @@ module.exports = {
 					defaultMode: volume.configMap.defaultMode
 				};
 			} else if (volume.type == 'persistentVolumeClaim') {
+
+				let claimName = `${deployment.name}-${volume.name}`;;
+				if (volume.persistentVolumeClaim) {
+					claimName = volume.persistentVolumeClaim.claimName;
+				}
+
 				spec.persistentVolumeClaim = {
-					claimName: volume.persistentVolumeClaim.claimName,
-					readOnly: volume.persistentVolumeClaim.readOnly
+					claimName: claimName,
+					readOnly: !!volume.persistentVolumeClaim?.readOnly
 				};
 			}
 
@@ -667,20 +715,105 @@ module.exports = {
 			const volumeMounts = await this.generateContainerVolumeMountsSpec(ctx, namespace, deployment, image);
 			// container env
 			const env = await this.generateContainerEnvSpec(ctx, namespace, deployment, image);
+			// container args
+			const args = await this.generateContainerArgsSpec(ctx, namespace, deployment, image);
+			// container liveness probe
+			const livenessProbe = await this.generateContainerLivenessProbeSpec(ctx, namespace, deployment, image);
+			// container readiness probe
+			const readinessProbe = await this.generateContainerReadinessProbeSpec(ctx, namespace, deployment, image);
+			// restartPolicy
+			const restartPolicy = deployment.restartPolicy || image.restartPolicy;
+
+
 
 			// create a container spec
 			const spec = {
 				name: image.name,
-				image: `${image.registry}/${image.name}:${image.tag}`,
-				imagePullPolicy: image.pullPolicy,
+				image: `${image.registry}/${image.repository}:${image.tag}`,
+				imagePullPolicy: image.imagePullPolicy,
 				resources,
 				ports,
+				livenessProbe,
+				readinessProbe,
 				volumeMounts,
-				env
+				env,
+				envFrom: [{
+					configMapRef: {
+						name: `${deployment.name}`
+					}
+				}],
+				restartPolicy,
 			};
+
 
 			// return the spec
 			return spec;
+		},
+
+		/**
+		 * generate a contrainer readiness probe spec
+		 * 
+		 * @param {Object} ctx - context
+		 * @param {Object} namespace - namespace Object
+		 * @param {Object} deployment - deployment object
+		 * @param {Object} image - image object
+		 * 
+		 * @returns {Object} spec
+		 */
+		async generateContainerReadinessProbeSpec(ctx, namespace, deployment, image) {
+			// create a container readiness probe spec
+			if (deployment.readinessProbe) {
+				return deployment.readinessProbe;
+			} else if (image.readinessProbe) {
+				return image.readinessProbe;
+			} else {
+				return undefined;
+			}
+		},
+
+		/**
+		 * generate a contrainer livness probe spec
+		 * 
+		 * @param {Object} ctx - context
+		 * @param {Object} namespace - namespace Object
+		 * @param {Object} deployment - deployment object
+		 * @param {Object} image - image object
+		 * 
+		 * @returns {Object} spec
+		 */
+		async generateContainerLivenessProbeSpec(ctx, namespace, deployment, image) {
+			// create a container liveness probe spec
+			if (deployment.livenessProbe) {
+				return deployment.livenessProbe;
+			} else if (image.livenessProbe) {
+				return image.livenessProbe;
+			} else {
+				return undefined;
+			}
+		},
+
+		/**
+		 * generate a container args spec
+		 * 
+		 * @param {Object} ctx - context
+		 * @param {Object} namespace - namespace Object
+		 * @param {Object} deployment - deployment object
+		 * @param {Object} image - image object
+		 * 
+		 * @returns {Object} spec
+		 */
+		async generateContainerArgsSpec(ctx, namespace, deployment, image) {
+			// create a container args spec
+			let args = [];
+			if (deployment.args) {
+				args = deployment.args;
+			} else if (image.args) {
+				args = image.args;
+			}
+			if (args.length == 0) {
+				args = undefined
+			}
+			return args
 		},
 
 		/**
@@ -696,17 +829,30 @@ module.exports = {
 		async generateContainerResourcesSpec(ctx, namespace, deployment, image) {
 			// create a container resources spec
 
-			// deployment resouces take presedent over image resources
 			const spec = {
 				requests: {
-					cpu: deployment.resources.request.cpu,
-					memory: deployment.resources.request.memory
+					cpu: 0,
+					memory: 0
 				},
 				limits: {
-					cpu: deployment.resources.limit.cpu,
-					memory: deployment.resources.limit.memory
+					cpu: 0,
+					memory: 0
 				}
-			};
+			}
+
+			if (deployment.resources) {
+				spec.requests.cpu = deployment.resources.requests.cpu;
+				spec.requests.memory = deployment.resources.requests.memory;
+
+				spec.limits.cpu = deployment.resources.limits.cpu;
+				spec.limits.memory = deployment.resources.limits.memory;
+			} else {
+				spec.requests.cpu = image.resources.requests.cpu;
+				spec.requests.memory = image.resources.requests.memory;
+
+				spec.limits.cpu = image.resources.limits.cpu;
+				spec.limits.memory = image.resources.limits.memory;
+			}
 
 			// return the spec
 			return spec;
@@ -726,22 +872,27 @@ module.exports = {
 			// create a container ports spec
 			const ports = [];
 
-			// loop over image ports
-			for (const port of image.ports) {
-				// create a port spec
-				const spec = await this.generateContainerPortSpec(ctx, namespace, deployment, image, port);
+			if (image.ports) {
+				// loop over image ports
+				for (const port of image.ports) {
+					// create a port spec
+					const spec = await this.generateContainerPortSpec(ctx, namespace, deployment, image, port);
 
-				// add the spec to the ports
-				ports.push(spec);
+					// add the spec to the ports
+					ports.push(spec);
+				}
 			}
 
-			// loop over deployment ports
-			for (const port of deployment.ports) {
-				// create a port spec
-				const spec = await this.generateContainerPortSpec(ctx, namespace, deployment, image, port);
 
-				// add the spec to the ports
-				ports.push(spec);
+			if (deployment.ports) {
+				// loop over deployment ports
+				for (const port of deployment.ports) {
+					// create a port spec
+					const spec = await this.generateContainerPortSpec(ctx, namespace, deployment, image, port);
+
+					// add the spec to the ports
+					ports.push(spec);
+				}
 			}
 
 			// return the ports
@@ -761,7 +912,7 @@ module.exports = {
 		async generateContainerPortSpec(ctx, namespace, deployment, image, port) {
 			// create a container port spec
 			const spec = {
-				"containerPort": port.targetPort,
+				"containerPort": port.port,
 				"type": port.type == 'UDP' ? 'UDP' : 'TCP',
 				"name": port.name
 			};
@@ -784,29 +935,36 @@ module.exports = {
 			// create a container volume mount spec
 			const volumeMounts = [];
 
-			// loop over image volumes
-			for (const volume of image.volumes) {
-				// create a volume mount spec
-				const spec = {
-					name: volume.name,
-					mountPath: volume.mountPath,
-				};
+			if (image.volumes) {
+				// loop over image volumes
+				for (const volume of image.volumes) {
+					// create a volume mount spec
+					const spec = {
+						name: volume.name,
+						mountPath: volume.mountPath,
+					};
 
-				// add the spec to the volume mounts
-				volumeMounts.push(spec);
+					// add the spec to the volume mounts
+					volumeMounts.push(spec);
+				}
 			}
 
-			// loop over deployment volumes
-			for (const volume of deployment.volumes) {
-				// create a volume mount spec
-				const spec = {
-					name: volume.name,
-					mountPath: volume.mountPath,
-				};
+			if (deployment.volumes) {
+				// loop over deployment volumes
+				for (const volume of deployment.volumes) {
+					// create a volume mount spec
+					const spec = {
+						name: volume.name,
+						mountPath: volume.mountPath,
+					};
 
-				// add the spec to the volume mounts
-				volumeMounts.push(spec);
+					// add the spec to the volume mounts
+					volumeMounts.push(spec);
+				}
 			}
+
+			// return the volume mounts
+			return volumeMounts;
 		},
 
 		/**
@@ -823,7 +981,7 @@ module.exports = {
 		async generateContainerPortSpec(ctx, namespace, deployment, image, port) {
 			// create a container port spec
 			const spec = {
-				"containerPort": port.internal,
+				"containerPort": port.port,
 				"type": port.type == 'udp' ? 'udp' : 'tcp',
 				"name": port.name
 			};
@@ -843,7 +1001,10 @@ module.exports = {
 		 * @returns {Object} spec
 		 */
 		async generateContainerEnvSpec(ctx, namespace, deployment, image) {
+			const envs = []
 
+			//return empty
+			return envs;
 		},
 
 		/**

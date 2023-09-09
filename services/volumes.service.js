@@ -55,7 +55,7 @@ module.exports = {
 
 		fields: {// db fields for volume
 
-			...FIELDS.VOLUME_FIELDS.props,
+			...FIELDS.VOLUME_FIELDS.properties,
 
 			...DbService.FIELDS,// inject dbservice fields
 			...Membership.FIELDS,// inject membership fields
@@ -75,7 +75,7 @@ module.exports = {
 	 */
 
 	actions: {
-		
+
 	},
 
 	/**
@@ -90,8 +90,8 @@ module.exports = {
 		 */
 		"k8s.volumes.created": {
 			async handler(ctx) {
-				const volume = ctx.params;
-
+				const volume = ctx.params.data;
+				console.log(ctx.meta)
 				// resolve namespace
 				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 					id: volume.namespace,
@@ -120,7 +120,7 @@ module.exports = {
 		 */
 		"k8s.volumes.removed": {
 			async handler(ctx) {
-				const volume = ctx.params;
+				const volume = ctx.params.data;
 
 			}
 		},
@@ -130,15 +130,15 @@ module.exports = {
 		 */
 		"k8s.deployments.created": {
 			async handler(ctx) {
-				const deployment = ctx.params;
+				const deployment = ctx.params.data;
 				// resolve namespace
 				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
-					name: deployment.namespace,
+					id: deployment.namespace,
 				});
 
 				//resolve image
 				const image = await ctx.call('v1.k8s.images.resolve', {
-					name: deployment.image,
+					id: deployment.image,
 				});
 
 
@@ -218,7 +218,7 @@ module.exports = {
 		 * @returns {Promise}
 		 */
 		async deleteEmptyDir(ctx, namespace, volume, deployment) {
-			
+
 		},
 
 		/**

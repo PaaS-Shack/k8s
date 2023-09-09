@@ -680,8 +680,86 @@ const SHORTVULUME_FIELDS = {
 
         // Read only flag of the volume
         readOnly: { type: 'boolean', default: false, required: false },
+
+        //
+        secret: VOLUMESECRET_FIELDS,
+        configMap: VOLUMECONFIGMAP_FIELDS,
+
+        // persistent volume config
+        persistentVolume: {
+            type: 'object',
+            properties: {
+                name: { type: 'string', empty: false, required: true },
+                type: { type: 'enum', values: ['hostPath', 'nfs', 'iscsi', 'glusterfs', 'rbd', 'cephfs', 'cinder', 'fc', 'flocker', 'flexVolume', 'azureFile', 'vsphereVolume', 'quobyte', 'azureDisk', 'portworxVolume', 'scaleIO', 'local', 'storageos', 'csi'], default: 'hostPath', required: true },
+                readOnly: { type: 'boolean', default: false, required: false },
+            }
+        },
+
+        // persistent volume claim config
+        persistentVolumeClaim: {
+            type: 'object',
+            properties: {
+                claimName: { type: 'string', empty: false, required: true },
+                readOnly: { type: 'boolean', default: false, required: false },
+            }
+        },
+
+        // host path volume config
+        hostPath: {
+            type: 'object',
+            properties: {
+                path: { type: 'string', empty: false, required: true },
+                type: { type: 'enum', values: ['DirectoryOrCreate','Directory', 'File', 'Socket', 'CharDevice', 'BlockDevice'], default: 'DirectoryOrCreate', required: false },
+            }
+        },
+
+        // nfs volume config
+        nfs: {
+            type: 'object',
+            properties: {
+                server: { type: 'string', empty: false, required: true },
+                path: { type: 'string', empty: false, required: true },
+                readOnly: { type: 'boolean', default: false, required: false },
+            }
+        },
+
+        // Empty dir volume
+        emptyDir: {
+            type: 'object',
+            properties: {
+                medium: { type: 'enum', values: ['Memory'], default: 'Memory', required: false },
+                sizeLimit: { type: 'number', min: 0, required: false },
+            }
+        },
     }
 }
+
+const DEPLOYMENTSTRATEGY_FIELDS = {
+    type: 'object',
+    properties: {
+        type: {
+            type: 'enum',
+            values: ['RollingUpdate', 'Recreate'],
+            default: 'RollingUpdate',
+            required: true
+        },
+        rollingUpdate: {
+            type: 'object',
+            properties: {
+                maxSurge: { type: 'number', min: 0, max: 100, default: 25, required: false },//percent
+                maxUnavailable: { type: 'number', min: 0, mac: 100, default: 25, required: false },// percent
+            }
+        }
+    },
+    default: {
+        type: 'RollingUpdate',
+        rollingUpdate: {
+            maxSurge: 25,
+            maxUnavailable: 25
+        }
+    },
+    required: false
+};
 
 // Image is a predefined deployments
 const IMAGE_FIELDS = {
@@ -714,6 +792,14 @@ const IMAGE_FIELDS = {
         readinessProbe: PROBE_FIELDS,
         // liveness probe
         livenessProbe: PROBE_FIELDS,
+        // history limit
+        revisionHistoryLimit: { type: 'number', min: 0, max: 10, default: 1, required: false },
+        // progressDeadlineSeconds
+        progressDeadlineSeconds: { type: 'number', min: 0, default: 600, required: false },
+
+
+        // deployment strategy
+        strategy: DEPLOYMENTSTRATEGY_FIELDS,
 
         // env
         env: { type: 'array', items: ENV_FIELDS, required: false },
@@ -811,6 +897,14 @@ const DEPLOYMENT_FIELDS = {
         readinessProbe: PROBE_FIELDS,
         // liveness probe
         livenessProbe: PROBE_FIELDS,
+
+        // history limit
+        revisionHistoryLimit: { type: 'number', min: 0, max: 10, default: 1, required: false },
+        // progressDeadlineSeconds
+        progressDeadlineSeconds: { type: 'number', min: 0, default: 600, required: false },
+
+        // deployment strategy
+        strategy: DEPLOYMENTSTRATEGY_FIELDS,
 
         // env
         env: { type: 'array', items: ENV_FIELDS, default: [], required: false },

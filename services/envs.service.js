@@ -16,7 +16,7 @@ module.exports = {
 	/**
 	 * Service name
 	 */
-	name: "envs",
+	name: "k8s.envs",
 
 	/**
 	 * Version number
@@ -27,8 +27,10 @@ module.exports = {
 	 * Service mixins
 	 */
 	mixins: [
-		DbService({}),
-		ConfigLoader(['envs.**'])
+		DbService({
+			permissions: 'k8s.envs'
+		}),
+		ConfigLoader(['k8s.**'])
 	],
 
 	/**
@@ -92,7 +94,7 @@ module.exports = {
 		 */
 		create: {
 			params: {
-				...FIELDS.ENV_FIELDS.props,
+				...FIELDS.ENV_FIELDS.properties,
 				called: { type: "boolean", optional: true, default: false },
 				deployment: { type: "string", min: 3, optional: false },
 				namespace: { type: "string", min: 3, optional: false }
@@ -101,7 +103,7 @@ module.exports = {
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
 
-				this.logger.info(`Creating ENV ${params.key} for ${params.reference}`);
+				this.logger.info(`Creating ENV ${params.key} for ${params.deployment}`);
 
 				let found = await this.findEntity(null, {
 					query: {
@@ -117,7 +119,7 @@ module.exports = {
 					// if value is different update
 					if (params.hasOwnProperty('value') && found.value != params.value) {
 
-						this.logger.info(`Updating ENV ${params.key} for ${params.reference}`)
+						this.logger.info(`Updating ENV ${params.key} for ${params.deployment}`)
 
 						return this.updateEntity(ctx, {
 							id: found.id,
@@ -140,14 +142,14 @@ module.exports = {
 						numbers: true
 					});
 
-					this.logger.info(`Generating secret ENV ${params.key} for ${params.reference}`);
+					this.logger.info(`Generating secret ENV ${params.key} for ${params.deployment}`);
 				} else if (params.type == 'provision') {
 					// if type is provision make the provitions call if not called
 
 					const callCMD = `v1.${params.key}.provision`
 
 					if (!params.called) {
-						this.logger.info(`Provisioning ENV ${params.key} for ${params.reference} at ${callCMD}`)
+						this.logger.info(`Provisioning ENV ${params.key} for ${params.deployment} at ${callCMD}`)
 
 						// resolve namespace and deployment
 						const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
@@ -188,14 +190,14 @@ module.exports = {
 
 					const routes = await ctx.call('v1.routes.resolve', {
 						id: deployment.routes,
-						fields: ['vHosts']
+						fields: ['vHost']
 					});
 
 					// pick first vHost
 					const vHost = routes[0].vHost;
 
 					// filter out http routes
-					const routePorts = image.ports.filter((p) => p.type == 'HTTP')
+					const routePorts = image.ports.filter((p) => p.protocol == 'HTTP');
 
 					//get subdomain
 					const { subdomain } = routePorts[params.index];
@@ -391,7 +393,7 @@ module.exports = {
 				const params = Object.assign({}, ctx.params);
 				const entity = {};
 
-				this.logger.info(`Packing ENV ${params.scope} for ${params.reference}`)
+				this.logger.info(`Packing ENV ${params.scope} for ${params.deployment}`)
 
 				// find all envs for deployment
 				let found = await this.findEntities(null, {
@@ -428,7 +430,7 @@ module.exports = {
 
 					const callCMD = `v1.${element.key}.pack`;
 
-					this.logger.info(`Packing provisioned ENV ${element.key} for ${params.reference} at ${callCMD}`)
+					this.logger.info(`Packing provisioned ENV ${element.key} for ${params.deployment} at ${callCMD}`)
 
 					// call pack on provisioned env
 					const entity = await ctx.call(callCMD, {
@@ -485,25 +487,25 @@ module.exports = {
 				const params = Object.assign({}, ctx.params);
 
 				// resolve namespace
-				const namespace = await ctx.call('v1.namespaces.resolve', {
+				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 					id: params.namespace,
 					fields: ['id', 'name', 'cluster']
 				});
 
 				// resolve deployment
-				const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
+				const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 					id: params.deployment,
-					fields: ['id', 'name', 'zone', 'envs']
+					fields: ['id', 'name', 'zone', 'env', 'ports']
 				});
 
 				// resolve image
-				const image = await ctx.call('v1.images.resolve', {
+				const image = await ctx.call('v1.k8s.images.resolve', {
 					id: params.image,
-					fields: ['id', 'name', 'envs', 'ports']
+					fields: ['id', 'name', 'env', 'ports']
 				});
 
 				// init deployment envs
-				await this.initDeploymentEnvs(ctx, namespace, deployment, image);
+				const promises = await this.initDeploymentEnvs(ctx, namespace, deployment, image);
 
 				// return envs
 				return this.findEntities(ctx, {
@@ -523,7 +525,7 @@ module.exports = {
 		/**
 		 * ENV remove event. Patch config map and deprovision if needed
 		 */
-		async "envs.removed"(ctx) {
+		async "k8s.envs.removed"(ctx) {
 			const env = ctx.params.data;
 
 			// patch config map
@@ -544,11 +546,11 @@ module.exports = {
 		/**
 		 * Create event, patch config map
 		 */
-		async "envs.created"(ctx) {
+		async "k8s.envs.created"(ctx) {
 			const env = ctx.params.data;
 
 			// patch config map
-			await this.patchConfigMap(ctx, env, true);
+			await this.patchConfigMap(ctx, env);
 		},
 
 		/**
@@ -564,7 +566,7 @@ module.exports = {
 		/**
 		 * Namedspace deployment create. Create config map
 		 */
-		async "namespaces.deployments.created"(ctx) {
+		async "k8s.deployments.created"(ctx) {
 			const deployment = ctx.params.data;
 			// init deployment envs 
 			await this.actions.createEnv({
@@ -577,9 +579,9 @@ module.exports = {
 		/**
 		 * Namespace deployment removed event. Remove all envs for deployment
 		 */
-		async "namespaces.deployments.removed"(ctx) {
+		async "k8s.deployments.removed"(ctx) {
 			const deployment = ctx.params.data;
-			const namespace = await ctx.call('v1.namespaces.resolve', {
+			const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 				id: deployment.namespace
 			});
 
@@ -597,7 +599,7 @@ module.exports = {
 				.then(() =>
 					this.logger.info(`ROUTE namespace remove event for ${namespace.name}`))
 		},
-		async "namespaces.removed"(ctx) {
+		async "k8s.namespaces.removed"(ctx) {
 			const namespace = ctx.params.data;
 
 			// find all envs for deployment
@@ -631,25 +633,31 @@ module.exports = {
 		 */
 		async initDeploymentEnvs(ctx, namespace, deployment, image) {
 			// create env entries for deployment and image envs
-			const envs = Promise.allSettled([
-				...image.envs.map((env) => {
-					return this.createEntity(ctx, {
+
+			const entities = [];
+
+			if (image.env) {
+				entities.push(...image.env.map((env) => {
+					return this.actions.create({
 						deployment: deployment.id,
 						namespace: namespace.id,
 						...env,
-					}, { permissive: true });
-				}),
-				...deployment.envs.map((env) => {
-					return this.createEntity(ctx, {
+					}, { parentCtx: ctx });
+				}));
+			}
+
+			if (deployment.env) {
+				entities.push(...deployment.env.map((env) => {
+					return this.actions.create({
 						deployment: deployment.id,
 						namespace: namespace.id,
-						...env
-					}, { permissive: true });
-				}),
-			]);
+						...env,
+					}, { parentCtx: ctx });
+				}));
+			}
 
 			// return envs
-			return envs;
+			return Promise.allSettled(entities);
 		},
 
 
@@ -662,12 +670,12 @@ module.exports = {
 		 */
 		async patchConfigMap(ctx, env, create = false) {
 			// resolve namespace and deployment
-			const namespace = await ctx.call('v1.namespaces.resolve', {
+			const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 				scope: false,
 				id: env.namespace,
 				fields: ['name', 'cluster']
 			});
-			const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
+			const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 				scope: false,
 				id: env.deployment,
 				fields: ['name']
@@ -680,7 +688,7 @@ module.exports = {
 				"metadata": {
 					"name": `${deployment.name}`
 				},
-				"data": await ctx.call('v1.envs.pack', {
+				"data": await ctx.call('v1.k8s.envs.pack', {
 					namespace: env.namespace,
 					deployment: env.deployment
 				})
@@ -704,15 +712,12 @@ module.exports = {
 				body: configMap
 			}).catch((err) => {
 				// if config map not found create it
-				if (err.code == 404) {
-					return ctx.call('v1.kube.createNamespacedConfigMap', {
-						namespace: namespace.name,
-						cluster: namespace.cluster,
-						name: deployment.name,
-						body: configMap
-					});
-				}
-				throw err;
+				return ctx.call('v1.kube.createNamespacedConfigMap', {
+					namespace: namespace.name,
+					cluster: namespace.cluster,
+					name: deployment.name,
+					body: configMap
+				});
 			});
 
 		}
