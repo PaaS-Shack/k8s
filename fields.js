@@ -107,6 +107,8 @@ const VOLUME_FIELDS = {
         // Read only flag of the volume
         readOnly: { type: 'boolean', default: false, required: false },
 
+        size: { type: 'number', min: 0, required: false },
+        accessModes: { type: 'array', items: { type: 'enum', values: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany'], default: 'ReadWriteOnce', required: false }, default: ['ReadWriteOnce'], required: false },
 
         secret: VOLUMESECRET_FIELDS,
         configMap: VOLUMECONFIGMAP_FIELDS,

@@ -75,6 +75,75 @@ module.exports = {
 	 */
 
 	actions: {
+		/**
+		 * Create a volume from volume ID
+		 * 
+		 * @actions
+		 * @params {String} id - volume ID
+		 * 
+		 * @returns {Object} Created volume
+		 */
+		apply: {
+			rest: {
+				method: "POST",
+				path: "/:id/apply"
+			},
+			permissions: ['k8s.deployments.apply'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+				const volume = await this.resolveEntities(ctx, { id: params.id });
+
+				// resolve namespace
+				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
+					id: volume.namespace,
+				});
+				//resolve deployment
+				const deployment = volume.deployment && await ctx.call('v1.k8s.deployments.resolve', {
+					id: volume.deployment,
+				});
+
+				//return volume;
+				return this.createVolume(ctx, volume, namespace, deployment);
+			}
+		},
+
+		/**
+		 * Get volume status
+		 * 
+		 * @actions
+		 * @params {String} id - volume ID
+		 * 
+		 * @returns {Object} Volume status
+		 */
+		status: {
+			rest: {
+				method: "GET",
+				path: "/:id/status"
+			},
+			permissions: ['k8s.deployments.status'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const volume = await this.resolveEntities(ctx, { id: params.id });
+
+				// resolve namespace
+				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
+					id: volume.namespace,
+				});
+
+				return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', {
+					namespace: namespace.name,
+					cluster: namespace.cluster,
+					name: `${volume.name}-claim`
+				});
+			}
+		},
 
 	},
 
@@ -181,6 +250,46 @@ module.exports = {
 	 * Methods
 	 */
 	methods: {
+		/**
+		 * Create volume
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} volume - volume object
+		 * @param {Object} namespace - namespace object
+		 * @param {Object} deployment - deployment object
+		 * 
+		 * @returns {Promise} Created volume
+		 */
+		async createVolume(ctx, volume, namespace, deployment) {
+			const volumeName = volume.volumeName;
+
+			let Volume = {};
+
+			switch (volume.type) {
+				case 'emptyDir':
+					Volume = await this.createEmptyDir(ctx, namespace, volume, deployment);
+					break;
+				case 'hostPath':
+					Volume = await this.createHostPath(ctx, namespace, volume, deployment);
+					break;
+				case 'configMap':
+					Volume = await this.createConfigMap(ctx, namespace, volume, deployment);
+					break;
+				case 'secret':
+					Volume = await this.createSecret(ctx, namespace, volume, deployment);
+					break;
+				case 'persistentVolumeClaim':
+					Volume = await this.createPVC(ctx, namespace, volume, deployment);
+					break;
+				case 'persistentVolume':
+					Volume = await this.createPV(ctx, namespace, volume, deployment);
+					break;
+				default:
+					break;
+			};
+
+			return Volume;
+		},
 		/**
 		 * Create emptyDir volume
 		 * 
@@ -375,7 +484,8 @@ module.exports = {
 
 					volumeName: volumeName,
 
-					accessModes: volume.accessMode,
+					accessModes: volume.accessModes,
+
 					resources: {
 						requests: {
 							storage: `${volume.size}Mi`

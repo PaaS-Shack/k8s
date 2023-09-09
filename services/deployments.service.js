@@ -129,6 +129,38 @@ module.exports = {
 		},
 
 		/**
+		 * Apply a deployment schema from id
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment schema
+		 */
+		apply: {
+			rest: {
+				method: "POST",
+				path: "/:id/apply"
+			},
+			permissions: ['k8s.deployments.apply'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
+
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+				return this.applyDeployment(ctx, namespace, deployment, image);
+			}
+		},
+
+
+
+		/**
 		 * Get namespace status
 		 * 
 		 * @actions
@@ -281,6 +313,7 @@ module.exports = {
 				const query = {
 					kind: 'Pod',
 					'metadata.namespace': namespace.name,
+					fields: ['status', 'metadata.name', 'metadata.namespace', 'metadata.labels', 'metadata.uid'],
 				}
 
 				// deploymant lables
@@ -292,6 +325,50 @@ module.exports = {
 				}
 
 				return ctx.call('v1.kube.find', query);
+			}
+		},
+
+		/**
+		 * Get deployment state by pod status of the deployment
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment state
+		 */
+		state: {
+			rest: {
+				method: "GET",
+				path: "/:id/state"
+			},
+			permissions: ['k8s.deployments.state'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+				// get pods and thier state
+				const pods = await this.actions.pods({
+					id: deployment.id
+				});
+				const podStates = await this.getPodStates(ctx, pods);
+
+				// get deployment status
+				const status = await this.actions.status({
+					id: deployment.id
+				});
+
+				return {
+					state: podStates.find((pod) => pod.state == 'Running') ? 'Running' : 'Pending',
+					pods: podStates,
+					...status
+				}
 			}
 		},
 
@@ -322,17 +399,9 @@ module.exports = {
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
-				return ctx.call('v1.kube.patchNamespacedDeployment', {
-					name: deployment.name,
-					namespace: namespace.name,
-					cluster: namespace.cluster,
-					body: {
-						spec: {
-							replicas: params.replicas
-						}
-					}
-				}).then((res) => {
-					return res.status;
+				return this.updateEntity(ctx, {
+					id: deployment.id,
+					replicas: params.replicas
 				});
 			}
 		},
@@ -367,15 +436,43 @@ module.exports = {
 					namespace: namespace.name,
 					cluster: namespace.cluster,
 					body: {
-						metadata: {
-							annotations: {
-								'k8s.one-host.ca/restartedAt': new Date().toISOString()
+						spec: {
+							template: {
+								metadata: {
+									annotations: {
+										'kubectl.kubernetes.io/restartedAt': new Date().toISOString()
+									}
+								}
 							}
 						}
 					}
 				}).then((res) => {
-					return res.status;
+					return res;
 				});
+			}
+		},
+
+		/**
+		 * Describe the depmloment
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment discrioption 
+		 */
+		describe: {
+			rest: {
+				method: "GET",
+				path: "/:id/describe"
+			},
+			permissions: ['k8s.deployments.describe'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+				
+
 			}
 		},
 	},
@@ -427,6 +524,28 @@ module.exports = {
 	 */
 	methods: {
 		/**
+		 * Get pod states
+		 * 
+		 * @param {Object} ctx - context
+		 * @param {Array} pods - array of pods
+		 * 
+		 * @returns {Promise} pod states
+		 */
+		async getPodStates(ctx, pods) {
+			const states = [];
+
+			// loop pods and determin its state
+			for (const pod of pods) {
+				states.push({
+					name: pod.metadata.name,
+					state: pod.status.phase,
+				});
+			}
+
+			return states;
+		},
+
+		/**
 		 * Apply a kubernetes deployment schema
 		 * 
 		 * @param {Object} ctx - context
@@ -441,12 +560,14 @@ module.exports = {
 			const schema = await this.createDeploymentSchema(ctx, namespace, deployment, image);
 
 			// apply the schema
-			await ctx.call("v1.kube.replaceNamespacedDeployment", {
+			const resource = await ctx.call("v1.kube.replaceNamespacedDeployment", {
 				name: deployment.name,
 				namespace: namespace.name,
 				cluster: namespace.cluster,
 				body: schema
 			});
+
+			return resource;
 		},
 
 		/**
@@ -760,6 +881,10 @@ module.exports = {
 				}
 			}
 
+			if (affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions.length == 0) {
+				return {};
+			}
+
 			// return the affinity
 			return affinity;
 		},
@@ -931,7 +1056,7 @@ module.exports = {
 				};
 			} else if (volume.type == 'persistentVolumeClaim') {
 
-				let claimName = `${deployment.name}-${volume.name}`;;
+				let claimName = `${volume.name}-claim`;
 				if (volume.persistentVolumeClaim) {
 					claimName = volume.persistentVolumeClaim.claimName;
 				}
@@ -990,6 +1115,7 @@ module.exports = {
 				readinessProbe,
 				volumeMounts,
 				env,
+				args,
 				envFrom: [{
 					configMapRef: {
 						name: `${deployment.name}`
@@ -1094,17 +1220,17 @@ module.exports = {
 			}
 
 			if (deployment.resources) {
-				spec.requests.cpu = deployment.resources.requests.cpu;
-				spec.requests.memory = deployment.resources.requests.memory;
+				spec.requests.cpu = `${deployment.resources.requests.cpu}m`;
+				spec.requests.memory = `${deployment.resources.requests.memory}Mi`;
 
-				spec.limits.cpu = deployment.resources.limits.cpu;
-				spec.limits.memory = deployment.resources.limits.memory;
+				spec.limits.cpu = `${deployment.resources.limits.cpu}m`;
+				spec.limits.memory = `${deployment.resources.limits.memory}Mi`;
 			} else {
-				spec.requests.cpu = image.resources.requests.cpu;
-				spec.requests.memory = image.resources.requests.memory;
+				spec.requests.cpu = `${image.resources.requests.cpu}m`;
+				spec.requests.memory = `${image.resources.requests.memory}Mi`;
 
-				spec.limits.cpu = image.resources.limits.cpu;
-				spec.limits.memory = image.resources.limits.memory;
+				spec.limits.cpu = `${image.resources.limits.cpu}m`;
+				spec.limits.memory = `${image.resources.limits.memory}Mi`;
 			}
 
 			// return the spec
