@@ -195,9 +195,7 @@ module.exports = {
 						{ id }
 					);
 				}
-
 			}
-
 		},
 
 
@@ -222,7 +220,7 @@ module.exports = {
 				// iterate over all files
 				for (let i = 0; i < files.length; i++) {
 					const file = files[i];
-					
+
 					// parse file content
 					const schema = require(`.${dirname}/${file}`);
 
@@ -245,6 +243,95 @@ module.exports = {
 			}
 		},
 
+		/**
+		 * Action to deploy a image to a namespace
+		 * 
+		 * @actions
+		 * @param {String} id - image id
+		 * @param {String} namespace - namespace id
+		 * @param {String} name - name of the deployment
+		 * @param {String} routes - routes to expose (default: image name)
+		 * @param {String} replicas - number of replicas (default: 0)
+		 * 
+		 * @requires {Promise} - returns deployment
+		 */
+		deploy: {
+			rest: {
+				method: "POST",
+				path: "/:id/deploy"
+			},
+			permissions: ['k8s.images.deploy'],
+			params: {
+				id: { type: "string", optional: false },
+				namespace: { type: "string", optional: false },
+				name: { type: "string", optional: false },
+				routes: { type: "array", default: [], optional: true },
+				replicas: { type: "number", default: 0, optional: true },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const id = params.id;
+				const namespace = params.namespace;
+				const name = params.name;
+				const routes = params.routes;
+				const replicas = params.replicas;
+
+				// check if image exists
+				const image = await this.resolveEntities(null, {
+					id
+				});
+
+				if (!image) {
+					throw new MoleculerClientError(
+						`No image found with id '${id}'`,
+						404,
+						"ERR_NO_IMAGE",
+						{ id }
+					);
+				}
+
+				// check if namespace exists
+				const ns = await ctx.call('v1.k8s.namespaces.resolve', { id: namespace });
+
+				if (!ns) {
+					throw new MoleculerClientError(
+						`No namespace found with id '${namespace}'`,
+						404,
+						"ERR_NO_NAMESPACE",
+						{ namespace }
+					);
+				}
+
+				// check if deployment exists
+				const deployment = await ctx.call('v1.k8s.deployments.resolve', { id: name, namespace });
+
+				if (deployment) {
+					throw new MoleculerClientError(
+						`Deployment '${name}' already exists`,
+						400,
+						"ERR_DEPLOYMENT_ALREADY_EXISTS",
+						{ name }
+					);
+				}
+
+				// if routes is empty add default route
+				if (routes.length === 0) {
+					const domain = await ctx.call('v1.domains.resolve', { id: ns.domain });
+
+					routes.push(`${name}.${domain.domain}`);
+
+					this.logger.info(`No routes specified, using default route '${routes[0]}'`);
+				}
+
+				// create deployment
+				const created = await this.createDeployment(image, ns, name, routes, replicas);
+
+				// return deployment
+				return created;
+			}
+		},
+
 	},
 
 	/**
@@ -258,10 +345,52 @@ module.exports = {
 	 * Methods
 	 */
 	methods: {
+		/**
+		 * Create deployment from image
+		 * 
+		 * @param {Object} image - image template
+		 * @param {Object} namespace - namespace object
+		 * @param {String} name - name of the deployment
+		 * @param {Array} vHosts - routes to expose
+		 * @param {Number} replicas - number of replicas
+		 * 
+		 * @requires {Promise} - returns deployment
+		 */
+		async createDeployment(image, namespace, name, vHosts, replicas) {
+			//create deployment from image
 
-		async validateSize({ ctx, value, params, id, entity }) {
-			return ctx.call("v1.sizes.resolve", { id: value })
-				.then((res) => res ? true : `No size '${value} not found'`)
+			const Deployment = {
+				name,
+				namespace: namespace.id,
+				image: image.id,
+				replicas,
+				routes: [],// add routes later
+			}
+
+			// create routes from vHosts
+			for (let i = 0; i < vHosts.length; i++) {
+				const vHost = vHosts[i];
+
+				//create route object
+				const route = await ctx.call('v1.routes.create', {
+					vHost
+				}).catch((err) => {
+					// if route already exists return it
+					if (err.code === 400 && err.type === 'ERR_ROUTE_ALREADY_EXISTS') {// TODO: update route to error ERR_ROUTE_ALREADY_EXISTS
+						return ctx.call('v1.routes.resolveRoute', { vHost });
+					} else {
+						throw err;
+					}
+				});
+
+				// add route to deployment
+				Deployment.routes.push(route.id);
+			}
+
+			// create deployment
+			const created = await ctx.call('v1.k8s.deployments.create', Deployment);
+
+			return created;
 		},
 	},
 
