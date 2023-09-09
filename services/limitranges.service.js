@@ -262,7 +262,7 @@ module.exports = {
 		/**
 		 * On namespace deleted delete corresponding resourcequota
 		 */
-		"k8s.namespaces.deleted": {
+		"k8s.namespaces.removed": {
 			async handler(ctx) {
 				const namespace = ctx.params.data;
 				this.logger.info(`Deleting namespace limit range ${namespace.name} on cluster ${namespace.cluster}`);

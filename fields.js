@@ -709,7 +709,7 @@ const IMAGE_FIELDS = {
         // image pull policy (Always)
         imagePullPolicy: { type: 'enum', values: ['Always', 'Never', 'IfNotPresent'], default: 'Always', required: false },
         // ports
-        ports: { type: 'array', items: PORT_FIELDS, required: false },
+        ports: { type: 'array', items: PORT_FIELDS, default: [], required: false },
         // readiness probe
         readinessProbe: PROBE_FIELDS,
         // liveness probe
@@ -718,7 +718,7 @@ const IMAGE_FIELDS = {
         // env
         env: { type: 'array', items: ENV_FIELDS, required: false },
         // volumes
-        volumes: { type: 'array', items: SHORTVULUME_FIELDS, required: false },
+        volumes: { type: 'array', items: SHORTVULUME_FIELDS, default: [], required: false },
         // resources
         resources: RESOURCE_FIELDS,
 
@@ -806,16 +806,16 @@ const DEPLOYMENT_FIELDS = {
         // deployment replicas (1)
         replicas: { type: 'number', default: 1, min: 0, max: 10, required: false },
         // deployment ports. can be used to open abatrairy ports outside of image ports
-        ports: { type: 'array', items: PORT_FIELDS, required: false },
+        ports: { type: 'array', items: PORT_FIELDS, default: [], required: false },
         // readiness probe
         readinessProbe: PROBE_FIELDS,
         // liveness probe
         livenessProbe: PROBE_FIELDS,
 
         // env
-        env: { type: 'array', items: ENV_FIELDS, required: false },
+        env: { type: 'array', items: ENV_FIELDS, default: [], required: false },
         // volumes
-        volumes: { type: 'array', items: SHORTVULUME_FIELDS, required: false },
+        volumes: { type: 'array', items: SHORTVULUME_FIELDS, default: [], required: false },
         // resources
         resources: RESOURCE_FIELDS,
 

@@ -317,7 +317,8 @@ module.exports = {
 
 				// if routes is empty add default route
 				if (routes.length === 0) {
-					const domain = await ctx.call('v1.domains.resolve', { id: ns.domain });
+					const options = { meta: { userID: ns.owner } }
+					const domain = await ctx.call('v1.domains.resolve', { id: ns.domain }, options);
 
 					routes.push(`${name}.${domain.domain}`);
 
@@ -325,7 +326,7 @@ module.exports = {
 				}
 
 				// create deployment
-				const created = await this.createDeployment(image, ns, name, routes, replicas);
+				const created = await this.createDeployment(ctx, image, ns, name, routes, replicas);
 
 				// return deployment
 				return created;
@@ -348,6 +349,7 @@ module.exports = {
 		/**
 		 * Create deployment from image
 		 * 
+		 * @param {Object} ctx - context object
 		 * @param {Object} image - image template
 		 * @param {Object} namespace - namespace object
 		 * @param {String} name - name of the deployment
@@ -356,7 +358,7 @@ module.exports = {
 		 * 
 		 * @requires {Promise} - returns deployment
 		 */
-		async createDeployment(image, namespace, name, vHosts, replicas) {
+		async createDeployment(ctx, image, namespace, name, vHosts, replicas) {
 			//create deployment from image
 
 			const Deployment = {
@@ -375,6 +377,7 @@ module.exports = {
 				const route = await ctx.call('v1.routes.create', {
 					vHost
 				}).catch((err) => {
+					return ctx.call('v1.routes.resolveRoute', { vHost });
 					// if route already exists return it
 					if (err.code === 400 && err.type === 'ERR_ROUTE_ALREADY_EXISTS') {// TODO: update route to error ERR_ROUTE_ALREADY_EXISTS
 						return ctx.call('v1.routes.resolveRoute', { vHost });

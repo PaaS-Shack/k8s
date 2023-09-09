@@ -317,6 +317,9 @@ module.exports = {
 		async deleteNamespace(ctx, namespace) {
 			const name = namespace.name;
 
+			// sleep for 10 secons
+			await new Promise((resolve) => setTimeout(resolve, 10000));
+
 			// delete namespace
 			return ctx.call('v1.kube.deleteNamespace', {
 				name,

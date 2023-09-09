@@ -99,7 +99,32 @@ module.exports = {
 		...Membership.ACTIONS,// inject membership actions
 		//...DbService.ACTIONS,// inject dbservice actions
 
+		/**
+		 * Generate a deployment schema from id
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment schema
+		 */
+		generate: {
+			rest: {
+				method: "GET",
+				path: "/:id/generate"
+			},
+			permissions: ['k8s.deployments.generate'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const deployment = await this.resolveEntities(ctx, { id: ctx.params.id });
+				const options = { meta: { userID: deployment.owner } };
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace }, options);
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
+				return await this.createDeploymentSchema(ctx, namespace, deployment, image);
+			}
+		}
 	},
 
 	/**
@@ -108,9 +133,11 @@ module.exports = {
 	events: {
 		"k8s.deployments.created": {
 			async handler(ctx) {
-				const deployment = ctx.params;
-				const namespace = await ctx.call("k8s.namespaces.resolve", { id: deployment.namespace });
-				const image = await ctx.call("k8s.images.resolve", { id: deployment.image });
+				const deployment = ctx.params.data;
+
+				const options = { meta: { userID: deployment.owner } };
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace }, options);
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
 				// after deployment is created create setup all the k8s resources
 				await this.createDeployment(ctx, namespace, deployment, image);
@@ -118,9 +145,11 @@ module.exports = {
 		},
 		"k8s.deployments.updated": {
 			async handler(ctx) {
-				const deployment = ctx.params;
-				const namespace = await ctx.call("k8s.namespaces.resolve", { id: deployment.namespace });
-				const image = await ctx.call("k8s.images.resolve", { id: deployment.image });
+				const deployment = ctx.params.data;
+
+				const options = { meta: { userID: deployment.owner } };
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace }, options);
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
 				// updated the deployment schema
 				await this.applyDeployment(ctx, namespace, deployment, image);
@@ -128,9 +157,11 @@ module.exports = {
 		},
 		"k8s.deployments.removed": {
 			async handler(ctx) {
-				const deployment = ctx.params;
-				const namespace = await ctx.call("k8s.namespaces.resolve", { id: deployment.namespace });
-				const image = await ctx.call("k8s.images.resolve", { id: deployment.image });
+				const deployment = ctx.params.data;
+
+				const options = { meta: { userID: deployment.owner } };
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace }, options);
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
 				// remove the deployment
 				await this.removeDeployment(ctx, namespace, deployment, image);
@@ -376,16 +407,20 @@ module.exports = {
 
 			const nodeSelector = {};
 
-			// loop over image node selectors
-			for (const selector of image.nodeSelectors) {
-				// add the selector to the node selector
-				nodeSelector[selector.name] = selector.value;
+			if (image.nodeSelectors) {
+				// loop over image node selectors
+				for (const selector of image.nodeSelectors) {
+					// add the selector to the node selector
+					nodeSelector[selector.name] = selector.value;
+				}
 			}
 
-			// loop over deployment node selectors
-			for (const selector of deployment.nodeSelectors) {
-				// add the selector to the node selector
-				nodeSelector[selector.name] = selector.value;
+			if (deployment.nodeSelectors) {
+				// loop over deployment node selectors
+				for (const selector of deployment.nodeSelectors) {
+					// add the selector to the node selector
+					nodeSelector[selector.name] = selector.value;
+				}
 			}
 
 			// return the node selector
@@ -419,16 +454,20 @@ module.exports = {
 				}
 			};
 
-			// loop over image affinities and merge
-			for (const affinity of image.affinities) {
-				// add the affinity to the affinity
-				affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions.push(affinity);
+			if (image.affinities) {
+				// loop over image affinities
+				for (const affinity of image.affinities) {
+					// add the affinity to the affinity
+					affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions.push(affinity);
+				}
 			}
 
-			// loop over deployment affinities and merge
-			for (const affinity of deployment.affinities) {
-				// add the affinity to the affinity
-				affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions.push(affinity);
+			if (deployment.affinities) {
+				// loop over deployment affinities
+				for (const affinity of deployment.affinities) {
+					// add the affinity to the affinity
+					affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions.push(affinity);
+				}
 			}
 
 			// return the affinity
@@ -478,25 +517,29 @@ module.exports = {
 		 */
 		async generateSecurityContextSpec(ctx, namespace, deployment, image) {
 			// create a deployment security context spec
+			if (deployment.securityContext) {
+				const securityContext = {
+					fsGroup: deployment.securityContext.fsGroup,
+					runAsUser: deployment.securityContext.runAsUser,
+					runAsGroup: deployment.securityContext.runAsGroup,
+					runAsNonRoot: deployment.securityContext.runAsNonRoot,
+					supplementalGroups: deployment.securityContext.supplementalGroups,
+					allowPrivilegeEscalation: deployment.securityContext.allowPrivilegeEscalation,
+					privileged: deployment.securityContext.privileged,
+					procMount: deployment.securityContext.procMount,
+					readonlyRootFilesystem: deployment.securityContext.readonlyRootFilesystem,
+					capabilities: {
+						add: deployment.securityContext.capabilities.add,
+						drop: deployment.securityContext.capabilities.drop
+					}
+				};
 
-			const securityContext = {
-				fsGroup: deployment.securityContext.fsGroup,
-				runAsUser: deployment.securityContext.runAsUser,
-				runAsGroup: deployment.securityContext.runAsGroup,
-				runAsNonRoot: deployment.securityContext.runAsNonRoot,
-				supplementalGroups: deployment.securityContext.supplementalGroups,
-				allowPrivilegeEscalation: deployment.securityContext.allowPrivilegeEscalation,
-				privileged: deployment.securityContext.privileged,
-				procMount: deployment.securityContext.procMount,
-				readonlyRootFilesystem: deployment.securityContext.readonlyRootFilesystem,
-				capabilities: {
-					add: deployment.securityContext.capabilities.add,
-					drop: deployment.securityContext.capabilities.drop
-				}
-			};
+				// return the security context
+				return securityContext;
+			}
 
-			// return the security context
-			return securityContext;
+			// return undefined
+			return undefined;
 		},
 
 		/**
