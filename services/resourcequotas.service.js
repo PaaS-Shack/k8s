@@ -29,14 +29,17 @@ module.exports = {
 	 */
 	mixins: [
 		DbService({}),
-		ConfigLoader(['resourcequotas.**'])
+		ConfigLoader(['k8s.**'])
 	],
 
 	/**
 	 * Service dependencies
 	 */
 	dependencies: [
-
+		{
+			name: "kube",
+			version: 1
+		}
 	],
 
 	/**
@@ -122,7 +125,15 @@ module.exports = {
 	 */
 
 	actions: {
-
+		clean: {
+			params: {},
+			async handler(ctx) {
+				const entities = await this.findEntities(ctx, { scope: false })
+				console.log(entities)
+				return Promise.allSettled(entities.map((entity) =>
+					this.removeEntity(ctx, { scope: false, id: entity.id })))
+			}
+		},
 		/**
 		 * Seed the database with resourcequotas
 		 * 
@@ -194,8 +205,8 @@ module.exports = {
 
 		"k8s.namespaces.created": {
 			async handler(ctx) {
-				const namespace = ctx.params;
-
+				const namespace = ctx.params.data;
+				this.logger.info(`Creating namespace resource quota ${namespace.name} on cluster ${namespace.cluster}`);
 				// create resourcequota
 				return this.createResourceQuota(ctx, namespace);
 			}
@@ -206,8 +217,8 @@ module.exports = {
 		 */
 		"k8s.namespaces.deleted": {
 			async handler(ctx) {
-				const namespace = ctx.params;
-
+				const namespace = ctx.params.data;
+				this.logger.info(`Deleting namespace resource quota ${namespace.name} on cluster ${namespace.cluster}`);
 				// delete resourcequota
 				return this.deleteResourceQuota(ctx, namespace);
 			}
@@ -238,7 +249,7 @@ module.exports = {
 					name: `${name}-resourcequota`
 				},
 				spec: {
-					hard: await ctx.call('v1.resourcequotas.pack', { id: namespace.resourcequota })
+					hard: await ctx.call('v1.k8s.resourcequotas.pack', { id: namespace.resourceQuota })
 				}
 			};
 
@@ -369,19 +380,20 @@ module.exports = {
 			// generated list of resourcequotas limits and requests
 			for (let index = 0; index < names.length; index++) {
 				const name = names[index];
+				const multiplire = index + 1;
 				// resourcequota limits and requests are base*index
 				const resourcequota = {
 					name: name,
-					"requests.cpu": cpuBase * index,
-					"requests.memory": memBase * index,
-					"requests.storage": storageBase * index,
-					"limits.cpu": cpuBase * index,
-					"limits.memory": memBase * index,
-					"pods": 10 * index,
-					"secrets": 10 * index,
-					"persistentvolumeclaims": 10 * index,
-					"services.loadbalancers": 10 * index,
-					"services.nodeports": 10 * index,
+					"requests.cpu": cpuBase * multiplire,
+					"requests.memory": memBase * multiplire,
+					"requests.storage": storageBase * multiplire,
+					"limits.cpu": cpuBase * multiplire * 2,
+					"limits.memory": memBase * multiplire * 2,
+					"pods": 10 * multiplire,
+					"secrets": 10 * multiplire,
+					"persistentvolumeclaims": 10 * multiplire,
+					"services.loadbalancers": 10 * multiplire,
+					"services.nodeports": 10 * multiplire,
 				};
 				//create new resourcequota
 				resourcequotas.push(resourcequota);

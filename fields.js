@@ -689,10 +689,13 @@ const IMAGE_FIELDS = {
     properties: {
         // image name
         name: { type: 'string', empty: false, required: true },
+
         // image namespace 
         namespace: { type: 'string', empty: false, required: true },
+
         // image tag (lastest)
         tag: { type: 'string', empty: false, required: true },
+
         // image digest
         digest: { type: 'string', empty: false, required: false },
         // image registry (docker.io)
@@ -788,6 +791,18 @@ const DEPLOYMENT_FIELDS = {
                 action: 'k8s.images.resolve',
             }
         },
+
+        // deployment routes
+        routes: {
+            type: 'array',
+            items: 'string',
+            required: false,
+            default: [],
+            populate: {
+                action: 'v1.routes.resolve',
+            }
+        },
+
         // deployment replicas (1)
         replicas: { type: 'number', default: 1, min: 0, max: 10, required: false },
         // deployment ports. can be used to open abatrairy ports outside of image ports
@@ -838,38 +853,6 @@ const DEPLOYMENT_FIELDS = {
     }
 };
 
-const exampleService = {
-    name: 'my-service',
-    type: 'ClusterIP',
-    ports: [
-        {
-            name: 'http',
-            port: 80,
-            targetPort: 8080,
-            protocol: 'TCP'
-        }
-    ],
-    selector: [
-        {
-            key: 'app',
-            value: 'my-app'
-        }
-    ],
-    externalIPs: [
-        '1.1.1.1',
-        '1.1.1.2'
-    ],
-    loadBalancerIP: '',
-    loadBalancerSourceRanges: [
-
-    ],
-    externalName: '',
-    sessionAffinity: 'None',
-    externalTrafficPolicy: 'Cluster',
-    healthCheckNodePort: 0,
-    publishNotReadyAddresses: false,
-    clusterIP: ''
-};
 
 const SERVICE_FIELDS = {
     type: 'object',
@@ -967,9 +950,32 @@ const STORAGECLASS_FIELDS = {
 const NAMESPACE_FIELDS = {
     type: 'object',
     properties: {
-        name: { type: 'string', empty: false, required: true },
+        name: {
+            ftype: 'string',
+            empty: false,
+            required: true,
+            pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$', // DNS-1123 label
+            immutable: true,
+        },
+
         labels: LABELS_FIELDS,
         annotations: LABELS_FIELDS,
+
+        resourceQuota: {
+            type: 'string',
+            required: true,
+            populate: {
+                action: 'k8s.resourceQuotas.resolve',
+            }
+        },
+        domain: {
+            type: 'string',
+            required: true,
+            immutable: true,
+            populate: {
+                action: 'v1.domains.resolve',
+            }
+        }
     }
 };
 
@@ -1028,6 +1034,8 @@ const BASE_ENTITY_FIELDS = {
         annotations: LABELS_FIELDS,
     }
 };
+
+
 
 module.exports = {
     IMAGE_FIELDS,

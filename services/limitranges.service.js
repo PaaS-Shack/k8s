@@ -11,40 +11,31 @@ const { MoleculerClientError } = require("moleculer").Errors;
  * attachments of addons service
  */
 module.exports = {
-	name: "limitranges",
+	name: "k8s.limitranges",
 	version: 1,
 
 	mixins: [
-		DbService({
-			cache: {
-
-			},
-		}),
-		ConfigLoader(['limitranges.**'])
+		DbService({}),
+		ConfigLoader(['k8s.**'])
 	],
 
 	/**
 	 * Service dependencies
 	 */
 	dependencies: [
-
+		{
+			name: "kube",
+			version: 1
+		}
 	],
 
 	/**
 	 * Service settings
 	 */
 	settings: {
-		rest: "/v1/limitranges/",
+		rest: "/v1/k8s/limitranges/",
 
 		fields: {
-			id: {
-				type: "string",
-				primaryKey: true,
-				secure: true,
-				columnName: "_id"
-			},
-
-
 
 			max: {
 				cpu: {
@@ -106,32 +97,24 @@ module.exports = {
 
 
 
-			options: { type: "object" },
-			createdAt: {
-				type: "number",
-				readonly: true,
-				onCreate: () => Date.now(),
-			},
-			updatedAt: {
-				type: "number",
-				readonly: true,
-				onUpdate: () => Date.now(),
-			},
-			deletedAt: {
-				type: "number",
-				readonly: true,
-				hidden: "byDefault",
-				onRemove: () => Date.now(),
-			},
+			...DbService.FIELDS,// inject dbservice fields
 		},
 
+		// default database populates
+		defaultPopulates: [],
+
+		// database scopes
 		scopes: {
-
-			// attachment the not deleted addons.attachments
-			notDeleted: { deletedAt: null }
+			...DbService.SCOPE,// inject dbservice scope
 		},
 
-		defaultScopes: ["notDeleted"]
+		// default database scope
+		defaultScopes: [...DbService.DSCOPE],// inject dbservice dscope
+
+		// default init config settings
+		config: {
+
+		}
 	},
 
 	/**
@@ -269,8 +252,8 @@ module.exports = {
 
 		"k8s.namespaces.created": {
 			async handler(ctx) {
-				const namespace = ctx.params;
-
+				const namespace = ctx.params.data;
+				this.logger.info(`Creating namespace limit range ${namespace.name} on cluster ${namespace.cluster}`);
 				// create resourcequota
 				return this.createLimitRange(ctx, namespace);
 			}
@@ -281,8 +264,8 @@ module.exports = {
 		 */
 		"k8s.namespaces.deleted": {
 			async handler(ctx) {
-				const namespace = ctx.params;
-
+				const namespace = ctx.params.data;
+				this.logger.info(`Deleting namespace limit range ${namespace.name} on cluster ${namespace.cluster}`);
 				// delete resourcequota
 				return this.deleteLimitRange(ctx, namespace);
 			}
@@ -315,7 +298,7 @@ module.exports = {
 					}
 				},
 				spec: {
-					limits: await ctx.call('v1.limitranges.pack')
+					limits: await ctx.call('v1.k8s.limitranges.pack')
 				}
 			};
 

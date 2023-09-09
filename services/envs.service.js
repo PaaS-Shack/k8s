@@ -150,11 +150,11 @@ module.exports = {
 						this.logger.info(`Provisioning ENV ${params.key} for ${params.reference} at ${callCMD}`)
 
 						// resolve namespace and deployment
-						const namespace = await ctx.call('v1.namespaces.resolve', {
+						const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 							id: params.namespace,
 							fields: ['name', 'cluster']
 						});
-						const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
+						const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 							id: params.deployment,
 							fields: ['name', 'zone']
 						});
@@ -175,19 +175,24 @@ module.exports = {
 					// if type is route resolve the route
 
 					//resolve deployment
-					const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
+					const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 						id: params.deployment,
-						fields: ['name', 'zone', 'vHosts', 'image', 'owner']
+						fields: ['name', 'zone', 'routes', 'image', 'owner']
 					});
 
 					// resolve deployment image
-					const image = await ctx.call('v1.images.resolve', {
+					const image = await ctx.call('v1.k8s.images.resolve', {
 						id: deployment.image,
 						fields: ['ports']
 					});
 
+					const routes = await ctx.call('v1.routes.resolve', {
+						id: deployment.routes,
+						fields: ['vHosts']
+					});
+
 					// pick first vHost
-					const vHost = deployment.vHosts[0];
+					const vHost = routes[0].vHost;
 
 					// filter out http routes
 					const routePorts = image.ports.filter((p) => p.type == 'HTTP')
@@ -204,7 +209,7 @@ module.exports = {
 
 				} else if (params.type == 'username') {
 					//if type is username resolve the username
-					const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
+					const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 						id: params.deployment,
 						namespace: params.namespace,
 						fields: ['owner']
@@ -220,7 +225,7 @@ module.exports = {
 					params.value = user.username;
 				} else if (params.type == 'namespace') {
 					// if type is namespace resolve the namespace
-					const namespace = await ctx.call('v1.namespaces.resolve', {
+					const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 						id: params.namespace,
 						fields: ['name']
 					});
@@ -229,7 +234,7 @@ module.exports = {
 					params.value = namespace.name;
 				} else if (params.type == 'deployment') {
 					// if type is deployment resolve the deployment
-					const deployment = await ctx.call('v1.namespaces.deployments.resolve', {
+					const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 						id: params.deployment,
 						fields: ['name']
 					});
