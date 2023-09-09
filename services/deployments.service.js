@@ -204,15 +204,15 @@ module.exports = {
 				}
 
 				const Pod = await ctx.call('v1.kube.findOne', query);
-				console.log(Pod)
+
 
 				return ctx.call('v1.kube.logs', {
 					name: Pod.metadata.name,
 					namespace: Pod.metadata.namespace,
 					cluster: namespace.cluster
 				}).then((res) => {
-					return res.join('').split('\n')
-				})
+					return res.join('').split('\n');
+				});
 			}
 		},
 
@@ -331,6 +331,50 @@ module.exports = {
 							replicas: params.replicas
 						}
 					}
+				}).then((res) => {
+					return res.status;
+				});
+			}
+		},
+
+		/**
+		 * Rolling restart a deployment by patching the deployment annotation with a new timestamp
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment pods
+		 */
+		restart: {
+			rest: {
+				method: "POST",
+				path: "/:id/restart"
+			},
+			permissions: ['k8s.deployments.restart'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+				return ctx.call('v1.kube.patchNamespacedDeployment', {
+					name: deployment.name,
+					namespace: namespace.name,
+					cluster: namespace.cluster,
+					body: {
+						metadata: {
+							annotations: {
+								'k8s.one-host.ca/restartedAt': new Date().toISOString()
+							}
+						}
+					}
+				}).then((res) => {
+					return res.status;
 				});
 			}
 		},
