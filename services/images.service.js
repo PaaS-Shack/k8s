@@ -265,7 +265,7 @@ module.exports = {
 				id: { type: "string", optional: false },
 				namespace: { type: "string", optional: false },
 				name: { type: "string", optional: false },
-				routes: { type: "array", default: [], optional: true },
+				vHosts: { type: "array", default: [], optional: true },
 				replicas: { type: "number", default: 0, optional: true },
 			},
 			async handler(ctx) {
@@ -274,7 +274,7 @@ module.exports = {
 				const id = params.id;
 				const namespace = params.namespace;
 				const name = params.name;
-				const routes = params.routes;
+				const vHosts = params.vHosts;
 				const replicas = params.replicas;
 
 				// check if image exists
@@ -316,19 +316,19 @@ module.exports = {
 				}
 
 				// if routes is empty add default route
-				if (routes.length === 0) {
+				if (vHosts.length === 0) {
 					const options = { meta: { userID: ns.owner } }
 					const domain = await ctx.call('v1.domains.resolve', { id: ns.domain }, options);
 
 					const vHost = `${name}.${domain.domain}`;
 
-					routes.push(vHost);
+					vHosts.push(vHost);
 
 					this.logger.info(`No routes specified, using default route '${vHost}'`);
 				}
 
 				// create deployment
-				const created = await this.createDeployment(ctx, image, ns, name, routes, replicas);
+				const created = await this.createDeployment(ctx, image, ns, name, vHosts, replicas);
 
 				// return deployment
 				return created;
@@ -368,29 +368,11 @@ module.exports = {
 				namespace: namespace.id,
 				image: image.id,
 				replicas,
+				vHosts: vHosts,
 				routes: [],// add routes later
 			}
 
-			// create routes from vHosts
-			for (let i = 0; i < vHosts.length; i++) {
-				const vHost = vHosts[i];
 
-				//create route object
-				const route = await ctx.call('v1.routes.create', {
-					vHost
-				}).catch((err) => {
-					return ctx.call('v1.routes.resolveRoute', { vHost });// TODO: update route to error ERR_ROUTE_ALREADY_EXISTS
-					// if route already exists return it
-					if (err.code === 400 && err.type === 'ERR_ROUTE_ALREADY_EXISTS') {// TODO: update route to error ERR_ROUTE_ALREADY_EXISTS
-						return ctx.call('v1.routes.resolveRoute', { vHost });
-					} else {
-						throw err;
-					}
-				});
-
-				// add route to deployment
-				Deployment.routes.push(route.id);
-			}
 
 			// create deployment
 			const created = await ctx.call('v1.k8s.deployments.create', Deployment);

@@ -70,7 +70,49 @@ module.exports = {
 	 */
 
 	actions: {
+		/**
+		 * Get volume spec
+		 * 
+		 * @actions
+		 * @params {String} id - volume ID
+		 * 
+		 * @returns {Object} Volume status
+		 */
+		spec: {
+			rest: {
+				method: "GET",
+				path: "/:id/status"
+			},
+			permissions: ['k8s.services.status'],
+			params: {
+				id: { type: "string" }
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
 
+				// resolve service
+				const service = await ctx.call('v1.k8s.services.resolve', { id: params.id });
+				// resolve namespace
+				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
+					id: service.namespace,
+					fields: ['name', 'cluster']
+				});
+				// resolve deployment
+				const deployment = await ctx.call('v1.k8s.deployments.resolve', {
+					id: service.deployment,
+					fields: ['name']
+				});
+
+				// get service status
+				const status = await ctx.call('v1.kube.readNamespacedServiceStatus', {
+					namespace: namespace.name,
+					name: `${deployment.name}-service`,
+					cluster: namespace.cluster
+				});
+
+				return status.spec;
+			}
+		},
 	},
 
 	/**
@@ -316,9 +358,9 @@ module.exports = {
 			const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 				id: service.deployment,
 				//fields: ['name']
-				scope:'-notDeleted'
+				scope: '-notDeleted'
 			}, options);
-			
+
 
 			await ctx.call('v1.kube.deleteNamespacedService', {
 				namespace: namespace.name,

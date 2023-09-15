@@ -26,15 +26,7 @@ module.exports = {
         }
     ],
     env: [
-        {
-            key: "REGISTRY_HTTP_ADDR",
-            type: "route",
-            value: "https://${VHOST}"
-        },
-        {
-            key: "REGISTRY_HTTP_SECRET",
-            type: "secret",
-        },
+       
     ],
     volumes: [
         {

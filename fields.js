@@ -882,6 +882,14 @@ const DEPLOYMENT_FIELDS = {
             }
         },
 
+        // deployment vHosts
+        vHosts: {
+            type: 'array',
+            items: 'string',
+            default: [],
+            required: false,
+        },
+
         // deployment routes
         routes: {
             type: 'array',

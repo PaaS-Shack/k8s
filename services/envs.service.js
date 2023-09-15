@@ -179,7 +179,7 @@ module.exports = {
 					//resolve deployment
 					const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 						id: params.deployment,
-						fields: ['name', 'zone', 'routes', 'image', 'owner']
+						fields: ['name', 'zone', 'routes','vHosts', 'image', 'owner']
 					});
 
 					// resolve deployment image
@@ -188,13 +188,8 @@ module.exports = {
 						fields: ['ports']
 					});
 
-					const routes = await ctx.call('v1.routes.resolve', {
-						id: deployment.routes,
-						fields: ['vHost']
-					});
-
 					// pick first vHost
-					const vHost = routes[0].vHost;
+					const vHost = deployment.vHosts[0];
 
 					// filter out http routes
 					const routePorts = image.ports.filter((p) => p.protocol == 'HTTP');
