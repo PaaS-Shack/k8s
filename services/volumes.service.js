@@ -67,7 +67,10 @@ module.exports = {
 			...Membership.SCOPE,
 		},
 
-		defaultScopes: [...DbService.DSCOPE, ...Membership.DSCOPE]
+		defaultScopes: [
+			...DbService.DSCOPE,
+			...Membership.DSCOPE
+		]
 	},
 
 	/**
@@ -130,21 +133,22 @@ module.exports = {
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
 
+				// resolve volume
 				const volume = await this.resolveEntities(ctx, { id: params.id });
 
-				// resolve namespace
-				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
-					id: volume.namespace,
-				});
-
-				return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', {
-					namespace: namespace.name,
-					cluster: namespace.cluster,
-					name: `${volume.name}-claim`
-				});
+				return this.getVolumeStatus(ctx, volume);
 			}
 		},
 
+		clean: {
+			params: {},
+			async handler(ctx) {
+				const entities = await this.findEntities(ctx, { scope: false })
+				console.log(entities)
+				return Promise.allSettled(entities.map((entity) =>
+					this.removeEntity(ctx, { scope: false, id: entity.id })))
+			}
+		},
 	},
 
 	/**
@@ -160,15 +164,16 @@ module.exports = {
 		"k8s.volumes.created": {
 			async handler(ctx) {
 				const volume = ctx.params.data;
-				console.log(ctx.meta)
+				const options = { meta: { userID: volume.owner } };
+
 				// resolve namespace
 				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 					id: volume.namespace,
-				});
+				}, options);
 				//resolve deployment
 				const deployment = volume.deployment && await ctx.call('v1.k8s.deployments.resolve', {
 					id: volume.deployment,
-				});
+				}, options);
 
 				if (volume.type == 'persistentVolumeClaim') {
 					// create pvc
@@ -177,7 +182,7 @@ module.exports = {
 					// create pv
 					const createdPV = await this.createPV(ctx, namespace, volume, deployment);
 				}
-
+				this.logger.info(`volume ${volume.name} created`)
 
 			}
 		},
@@ -190,7 +195,27 @@ module.exports = {
 		"k8s.volumes.removed": {
 			async handler(ctx) {
 				const volume = ctx.params.data;
+				const options = { meta: { userID: volume.owner } };
 
+				// resolve namespace
+				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
+					id: volume.namespace,
+				}, options);
+				//resolve deployment
+				const deployment = volume.deployment && await ctx.call('v1.k8s.deployments.resolve', {
+					id: volume.deployment,
+					scope: '-notDeleted'
+				}, options);
+
+				if (volume.type == 'persistentVolumeClaim') {
+					// delte pvc
+					const deletedPVC = await this.deletePVC(ctx, namespace, volume, deployment);
+				} else if (volume.type == 'persistentVolume') {
+					// delete pv
+					const deletedPV = await this.deletePV(ctx, namespace, volume, deployment);
+				}
+
+				this.logger.info(`volume ${volume.name} deleted`);
 			}
 		},
 
@@ -200,10 +225,11 @@ module.exports = {
 		"k8s.deployments.created": {
 			async handler(ctx) {
 				const deployment = ctx.params.data;
+				const options = { meta: { userID: deployment.owner } }
 				// resolve namespace
 				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 					id: deployment.namespace,
-				});
+				}, options);
 
 				//resolve image
 				const image = await ctx.call('v1.k8s.images.resolve', {
@@ -214,21 +240,23 @@ module.exports = {
 				// loop image volumes
 				for (const volume of image.volumes) {
 					// create volume
-					const createdVolume = await this.createEntity(ctx, {
+					const createdVolume = await ctx.call('v1.k8s.volumes.create', {
 						namespace: namespace.id,
-						deployment: deployment?.id,
+						deployment: deployment.id,
 						...volume,
-					}, { permissive: true });
+					}, options)
+					this.logger.info(`volume ${volume.name} created from image ${image.name}`);
 				}
 
 				// loop deployment volumes
 				for (const volume of deployment.volumes) {
 					// create volume
-					const createdVolume = await this.createEntity(ctx, {
+					const createdVolume = await ctx.call('v1.k8s.volumes.create', {
 						namespace: namespace.id,
-						deployment: deployment?.id,
+						deployment: deployment.id,
 						...volume,
-					}, { permissive: true });
+					}, options)
+					this.logger.info(`volume ${volume.name} created from deployment ${deployment.name}`);
 				}
 
 			}
@@ -237,9 +265,34 @@ module.exports = {
 		/**
 		 * On namespace deleted delete corresponding resourcequota
 		 */
-		"k8s.deployments.deleted": {
+		"k8s.deployments.removed": {
 			async handler(ctx) {
-				// Create a new deployment object
+				const deployment = ctx.params.data;
+				const options = { meta: { userID: deployment.owner } }
+
+				// resolve namespace
+				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
+					id: deployment.namespace,
+				}, options);
+
+				// resolve volumes
+				const volumes = await ctx.call('v1.k8s.volumes.find', {
+					query: {
+						namespace: namespace.id,
+						deployment: deployment?.id,
+					}
+				}, options)
+
+				// loop deployment volumes
+				for (const volume of volumes) {
+					await ctx.call('v1.k8s.volumes.remove', {
+						id: volume.id
+					}, options).then((id) => {
+						this.logger.info(`volume ${volume.name} deleted id ${id}`);
+					}).catch(() => {
+						this.logger.error(`volume ${volume.name} delete failed`);
+					});
+				}
 
 
 			}
@@ -250,6 +303,42 @@ module.exports = {
 	 * Methods
 	 */
 	methods: {
+		/**
+		 * get volume status
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} volume - volume object
+		 * 
+		 * @returns {Promise} - returns volume status
+		 */
+		async getVolumeStatus(ctx, volume) {
+			// resolve namespace
+			const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
+				id: volume.namespace,
+			});
+			//resolve deployment
+			const deployment = volume.deployment && await ctx.call('v1.k8s.deployments.resolve', {
+				id: volume.deployment,
+			});
+
+			if (volume.type == 'persistentVolumeClaim') {
+				return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', {
+					namespace: namespace.name,
+					cluster: namespace.cluster,
+					name: `${volume.name}-claim`
+				}).then((res) => {
+					return res.status;
+				});
+			} else if (volume.type == 'persistentVolume') {
+				return ctx.call('v1.kube.readNamespacedPersistentVolume', {
+					namespace: namespace.name,
+					cluster: namespace.cluster,
+					name: `${volume.name}`
+				}).then((res) => {
+					return res.status;
+				});
+			}
+		},
 		/**
 		 * Create volume
 		 * 

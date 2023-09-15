@@ -107,7 +107,7 @@ const VOLUME_FIELDS = {
         // Read only flag of the volume
         readOnly: { type: 'boolean', default: false, required: false },
 
-        size: { type: 'number', min: 0, required: false },
+        size: { type: 'number', min: 0, default: 1024, required: false },
         accessModes: { type: 'array', items: { type: 'enum', values: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany'], default: 'ReadWriteOnce', required: false }, default: ['ReadWriteOnce'], required: false },
 
         secret: VOLUMESECRET_FIELDS,
@@ -683,6 +683,8 @@ const SHORTVULUME_FIELDS = {
         // Read only flag of the volume
         readOnly: { type: 'boolean', default: false, required: false },
 
+        size: { type: 'number', min: 0, default: 1024, required: false },// default 1GB
+
         //
         secret: VOLUMESECRET_FIELDS,
         configMap: VOLUMECONFIGMAP_FIELDS,
@@ -711,7 +713,7 @@ const SHORTVULUME_FIELDS = {
             type: 'object',
             properties: {
                 path: { type: 'string', empty: false, required: true },
-                type: { type: 'enum', values: ['DirectoryOrCreate','Directory', 'File', 'Socket', 'CharDevice', 'BlockDevice'], default: 'DirectoryOrCreate', required: false },
+                type: { type: 'enum', values: ['DirectoryOrCreate', 'Directory', 'File', 'Socket', 'CharDevice', 'BlockDevice'], default: 'DirectoryOrCreate', required: false },
             }
         },
 
@@ -853,7 +855,7 @@ const IMAGE_FIELDS = {
             type: 'string',
             required: false,
             populate: {
-                action: 'k8s.builds.resolve',
+                action: 'v1.k8s.builds.resolve',
             }
         },
     }
@@ -869,14 +871,14 @@ const DEPLOYMENT_FIELDS = {
         namespace: {
             type: 'string', empty: false, required: true,
             populate: {
-                action: 'k8s.namespaces.resolve',
+                action: 'v1.k8s.namespaces.resolve',
             },
         },
         // deployment image id
         image: {
             type: 'string', empty: false, required: true,
             populate: {
-                action: 'k8s.images.resolve',
+                action: 'v1.k8s.images.resolve',
             }
         },
 
@@ -954,10 +956,23 @@ const SERVICE_FIELDS = {
     type: 'object',
     properties: {
         name: { type: 'string', empty: false, required: true },
+        uid: { type: 'string', empty: false, required: false },
+        namespace: {
+            type: 'string', empty: false, required: true,
+            populate: {
+                action: 'v1.k8s.namespaces.resolve',
+            },
+        },
+        deployment: {
+            type: 'string', empty: false, required: true,
+            populate: {
+                action: 'v1.k8s.deployments.resolve',
+            }
+        },
         type: { type: 'enum', values: ['ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName'], default: 'ClusterIP', required: false },
         ports: { type: 'array', items: PORT_FIELDS, required: false },
         selector: LABELS_FIELDS,
-        externalIPs: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
+        externalIPs: { type: 'array', items: { type: 'string', empty: false, required: true }, default: [], required: false },
         loadBalancerIP: { type: 'string', empty: false, required: false },
         loadBalancerSourceRanges: { type: 'array', items: { type: 'string', empty: false, required: true }, required: false },
         externalName: { type: 'string', empty: false, required: false },
@@ -1068,7 +1083,7 @@ const NAMESPACE_FIELDS = {
             type: 'string',
             required: true,
             populate: {
-                action: 'k8s.resourceQuotas.resolve',
+                action: 'v1.k8s.resourceQuotas.resolve',
             }
         },
         domain: {

@@ -320,9 +320,11 @@ module.exports = {
 					const options = { meta: { userID: ns.owner } }
 					const domain = await ctx.call('v1.domains.resolve', { id: ns.domain }, options);
 
-					routes.push(`${name}.${domain.domain}`);
+					const vHost = `${name}.${domain.domain}`;
 
-					this.logger.info(`No routes specified, using default route '${routes[0]}'`);
+					routes.push(vHost);
+
+					this.logger.info(`No routes specified, using default route '${vHost}'`);
 				}
 
 				// create deployment
@@ -377,7 +379,7 @@ module.exports = {
 				const route = await ctx.call('v1.routes.create', {
 					vHost
 				}).catch((err) => {
-					return ctx.call('v1.routes.resolveRoute', { vHost });
+					return ctx.call('v1.routes.resolveRoute', { vHost });// TODO: update route to error ERR_ROUTE_ALREADY_EXISTS
 					// if route already exists return it
 					if (err.code === 400 && err.type === 'ERR_ROUTE_ALREADY_EXISTS') {// TODO: update route to error ERR_ROUTE_ALREADY_EXISTS
 						return ctx.call('v1.routes.resolveRoute', { vHost });
