@@ -460,10 +460,10 @@ module.exports = {
 		 * 
 		 * @returns {Promise} deployment discrioption 
 		 */
-		describe: {
+		createDeployment: {
 			rest: {
-				method: "GET",
-				path: "/:id/describe"
+				method: "POST",
+				path: "/:id/create"
 			},
 			permissions: ['k8s.deployments.describe'],
 			params: {
@@ -471,8 +471,14 @@ module.exports = {
 			},
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
-				
 
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
+
+				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
+
+				return this.createDeployment(ctx, namespace, deployment, image);
 			}
 		},
 	},
@@ -1011,6 +1017,7 @@ module.exports = {
 				}
 			}
 
+			console.log(volumes)
 			// return the volumes
 			return volumes;
 		},
@@ -1049,11 +1056,11 @@ module.exports = {
 					defaultMode: volume.secret.defaultMode
 				};
 			} else if (volume.type == 'configMap') {
-				spec.configMap = {
-					name: volume.configMap.name,
-					items: volume.configMap.items,
-					defaultMode: volume.configMap.defaultMode
-				};
+				// spec.configMap = {
+				// 	name: volume.configMap.name,
+				// 	items: volume.configMap.items,
+				// 	defaultMode: volume.configMap.defaultMode
+				// };
 			} else if (volume.type == 'persistentVolumeClaim') {
 
 				let claimName = `${volume.name}-claim`;
@@ -1314,9 +1321,9 @@ module.exports = {
 			// create a container volume mount spec
 			const volumeMounts = [];
 
-			if (image.volumes) {
-				// loop over image volumes
-				for (const volume of image.volumes) {
+			if (deployment.volumes) {
+				// loop over deployment volumes
+				for (const volume of deployment.volumes) {
 					// create a volume mount spec
 					const spec = {
 						name: volume.name,
@@ -1328,10 +1335,17 @@ module.exports = {
 				}
 			}
 
-			if (deployment.volumes) {
-				// loop over deployment volumes
-				for (const volume of deployment.volumes) {
+			if (image.volumes) {
+				// loop over image volumes
+				for (const volume of image.volumes) {
 					// create a volume mount spec
+
+					// check if volume exists
+					if (volumeMounts.find(v => v.name == volume.name)) {
+						continue;
+					}
+
+
 					const spec = {
 						name: volume.name,
 						mountPath: volume.mountPath,

@@ -237,16 +237,7 @@ module.exports = {
 				});
 
 
-				// loop image volumes
-				for (const volume of image.volumes) {
-					// create volume
-					const createdVolume = await ctx.call('v1.k8s.volumes.create', {
-						namespace: namespace.id,
-						deployment: deployment.id,
-						...volume,
-					}, options)
-					this.logger.info(`volume ${volume.name} created from image ${image.name}`);
-				}
+
 
 				// loop deployment volumes
 				for (const volume of deployment.volumes) {
@@ -257,6 +248,19 @@ module.exports = {
 						...volume,
 					}, options)
 					this.logger.info(`volume ${volume.name} created from deployment ${deployment.name}`);
+				}
+
+				// loop image volumes
+				for (const volume of image.volumes) {
+					// create volume
+					const found = deployment.volumes.find((v) => v.name == volume.name)
+					if (found) continue;
+					const createdVolume = await ctx.call('v1.k8s.volumes.create', {
+						namespace: namespace.id,
+						deployment: deployment.id,
+						...volume,
+					}, options)
+					this.logger.info(`volume ${volume.name} created from image ${image.name}`);
 				}
 
 			}

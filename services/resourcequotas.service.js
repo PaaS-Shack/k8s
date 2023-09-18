@@ -350,7 +350,7 @@ module.exports = {
 		 * @returns {Promise} - returns resourcequota
 		 */
 		async findByName(name) {
-			return this.actions.find({ query: { name } });
+			return this.findEntity(null, { query: { name } });
 		},
 
 		/**
