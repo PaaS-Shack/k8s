@@ -185,6 +185,8 @@ module.exports = {
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace },);
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
+
+
 				const resource = await ctx.call("v1.kube.readNamespacedDeployment", {
 					name: deployment.name,
 					namespace: namespace.name,
@@ -591,11 +593,16 @@ module.exports = {
 			const schema = await this.createDeploymentSchema(ctx, namespace, deployment, image);
 
 			// apply the schema
-			await ctx.call("v1.kube.createNamespacedDeployment", {
+			const result = await ctx.call("v1.kube.createNamespacedDeployment", {
 				name: deployment.name,
 				namespace: namespace.name,
 				cluster: namespace.cluster,
 				body: schema
+			});
+			// update deployment with uid
+			return this.updateEntity(ctx, {
+				id: deployment.id,
+				uid: result.metadata.uid
 			});
 		},
 

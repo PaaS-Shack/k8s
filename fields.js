@@ -882,6 +882,9 @@ const DEPLOYMENT_FIELDS = {
             }
         },
 
+        // k8s uid
+        uid: { type: 'string', empty: false, required: false },
+
         // deployment vHosts
         vHosts: {
             type: 'array',
