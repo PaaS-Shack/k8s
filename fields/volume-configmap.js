@@ -4,7 +4,7 @@ module.exports = {
     type: 'object',
     properties: {
         name: { type: 'string', empty: false, required: true },
-        secretName: { type: 'string', empty: false, required: true },
+        configMapName: { type: 'string', empty: false, required: true },
         items: {
             type: 'array',
             items: {
