@@ -11,40 +11,31 @@ const { MoleculerClientError } = require("moleculer").Errors;
  * attachments of addons service
  */
 module.exports = {
-	name: "limitranges",
+	name: "k8s.limitranges",
 	version: 1,
 
 	mixins: [
-		DbService({
-			cache: {
-
-			},
-		}),
-		ConfigLoader(['limitranges.**'])
+		DbService({}),
+		ConfigLoader(['k8s.**'])
 	],
 
 	/**
 	 * Service dependencies
 	 */
 	dependencies: [
-
+		{
+			name: "kube",
+			version: 1
+		}
 	],
 
 	/**
 	 * Service settings
 	 */
 	settings: {
-		rest: "/v1/limitranges/",
+		rest: "/v1/k8s/limitranges/",
 
 		fields: {
-			id: {
-				type: "string",
-				primaryKey: true,
-				secure: true,
-				columnName: "_id"
-			},
-
-
 
 			max: {
 				cpu: {
@@ -106,32 +97,24 @@ module.exports = {
 
 
 
-			options: { type: "object" },
-			createdAt: {
-				type: "number",
-				readonly: true,
-				onCreate: () => Date.now(),
-			},
-			updatedAt: {
-				type: "number",
-				readonly: true,
-				onUpdate: () => Date.now(),
-			},
-			deletedAt: {
-				type: "number",
-				readonly: true,
-				hidden: "byDefault",
-				onRemove: () => Date.now(),
-			},
+			...DbService.FIELDS,// inject dbservice fields
 		},
 
+		// default database populates
+		defaultPopulates: [],
+
+		// database scopes
 		scopes: {
-
-			// attachment the not deleted addons.attachments
-			notDeleted: { deletedAt: null }
+			...DbService.SCOPE,// inject dbservice scope
 		},
 
-		defaultScopes: ["notDeleted"]
+		// default database scope
+		defaultScopes: [...DbService.DSCOPE],// inject dbservice dscope
+
+		// default init config settings
+		config: {
+
+		}
 	},
 
 	/**
@@ -140,9 +123,12 @@ module.exports = {
 
 	actions: {
 		pack: {
-			description: "Add members to the addon",
+			description: "pack limitranges",
 			params: {
-
+				id: {
+					type: "string",
+					optional: true,
+				},
 			},
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
@@ -167,8 +153,9 @@ module.exports = {
 
 					return res;
 				}
-				return this.findEntities(null, {
 
+				return this.findEntities(null, {
+					id: params.id
 				}).then((res) => res.map((limit) => {
 
 					const entity = {
@@ -259,13 +246,88 @@ module.exports = {
 	 */
 	events: {
 
+		/**
+		 * On namespace created create corresponding resourcequota
+		 */
+
+		"k8s.namespaces.created": {
+			async handler(ctx) {
+				const namespace = ctx.params.data;
+				this.logger.info(`Creating namespace limit range ${namespace.name} on cluster ${namespace.cluster}`);
+				// create resourcequota
+				return this.createLimitRange(ctx, namespace);
+			}
+		},
+
+		/**
+		 * On namespace deleted delete corresponding resourcequota
+		 */
+		"k8s.namespaces.removed": {
+			async handler(ctx) {
+				const namespace = ctx.params.data;
+				this.logger.info(`Deleting namespace limit range ${namespace.name} on cluster ${namespace.cluster}`);
+				// delete resourcequota
+				return this.deleteLimitRange(ctx, namespace);
+			}
+		},
 	},
 
 	/**
 	 * Methods
 	 */
 	methods: {
+		/**
+		 * Create namedspace limit range
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise} 
+		 */
+		async createLimitRange(ctx, namespace) {
+			const name = namespace.name;
 
+			// limit range schema
+			const LimitRange = {
+				apiVersion: "v1",
+				kind: "LimitRange",
+				metadata: {
+					name: `${name}-limitrange`,
+					labels: {
+						name: `${name}-limitrange`
+					}
+				},
+				spec: {
+					limits: await ctx.call('v1.k8s.limitranges.pack')
+				}
+			};
+
+			// create limit range
+			return ctx.call('v1.kube.createNamespacedLimitRange', {
+				namespace: name,
+				body: LimitRange,
+				cluster: namespace.cluster
+			});
+		},
+
+		/**
+		 * Delete namedspace limit range
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise}
+		 */
+		async deleteLimitRange(ctx, namespace) {
+			const name = namespace.name;
+
+			// delete limit range
+			return ctx.call('v1.kube.deleteNamespacedLimitRange', {
+				namespace: name,
+				name: `${name}-limitrange`,
+				cluster: namespace.cluster
+			});
+		},
 	},
 
 	/**
