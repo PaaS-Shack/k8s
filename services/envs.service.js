@@ -263,10 +263,10 @@ module.exports = {
 
 				// remove all envs
 				return Promise.allSettled(entities.map((entity) =>
-					this.removeEntity(ctx, { scope: false, id: entity.id })))
-					.then(() =>
-						this.logger.info(`ROUTE clean`))
-
+					this.removeEntity(ctx, { scope: false, id: entity.id }))
+				).then(() =>
+					this.logger.info(`ROUTE clean`)
+				);
 			}
 		},
 
@@ -290,7 +290,7 @@ module.exports = {
 				return this.patchConfigMap(ctx, {
 					deployment: params.deployment,
 					namespace: params.namespace
-				})
+				});
 			}
 		},
 
@@ -529,7 +529,7 @@ module.exports = {
 			if (env.type == 'provision') {
 				const callCMD = `v1.${env.key}.deprovision`
 
-				this.logger.info(`Packing deprovision ENV ${env.key} for ${env.deployment} at ${callCMD}`)
+				this.logger.info(`Deprovision ENV ${env.key} for ${env.deployment} at ${callCMD}`)
 
 				await ctx.call(callCMD, {
 					id: env.value
@@ -713,7 +713,6 @@ module.exports = {
 					body: configMap
 				});
 			});
-
 		}
 	},
 

@@ -361,7 +361,6 @@ module.exports = {
 				scope: '-notDeleted'
 			}, options);
 
-
 			await ctx.call('v1.kube.deleteNamespacedService', {
 				namespace: namespace.name,
 				name: `${deployment.name}-service`,
@@ -382,7 +381,6 @@ module.exports = {
 	 * Service started lifecycle event handler
 	 */
 	started() { },
-
 
 	/**
 	 * Service stopped lifecycle event handler

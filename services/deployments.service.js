@@ -222,7 +222,6 @@ module.exports = {
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
-
 				const query = {
 					kind: 'Pod',
 					'metadata.namespace': namespace.name,
@@ -238,7 +237,6 @@ module.exports = {
 				}
 
 				const Pod = await ctx.call('v1.kube.findOne', query);
-
 
 				return ctx.call('v1.kube.logs', {
 					name: Pod.metadata.name,
@@ -282,7 +280,6 @@ module.exports = {
 				}
 
 				return ctx.call('v1.kube.find', query);
-
 			}
 		},
 
@@ -310,7 +307,6 @@ module.exports = {
 
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
-
 
 				const query = {
 					kind: 'Pod',
@@ -352,9 +348,6 @@ module.exports = {
 
 				const deployment = await this.resolveEntities(ctx, { id: params.id });
 
-				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
-				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
-
 				// get pods and thier state
 				const pods = await this.actions.pods({
 					id: deployment.id
@@ -370,7 +363,7 @@ module.exports = {
 					state: podStates.find((pod) => pod.state == 'Running') ? 'Running' : 'Pending',
 					pods: podStates,
 					...status
-				}
+				};
 			}
 		},
 
@@ -397,9 +390,6 @@ module.exports = {
 				const params = Object.assign({}, ctx.params);
 
 				const deployment = await this.resolveEntities(ctx, { id: params.id });
-
-				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
-				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
 				return this.updateEntity(ctx, {
 					id: deployment.id,
@@ -1114,8 +1104,8 @@ module.exports = {
 				// 	defaultMode: volume.configMap.defaultMode
 				// };
 			} else if (volume.type == 'persistentVolumeClaim') {
-
 				let claimName = `${volume.name}-claim`;
+
 				if (volume.persistentVolumeClaim) {
 					claimName = volume.persistentVolumeClaim.claimName;
 				}
@@ -1160,7 +1150,6 @@ module.exports = {
 			const readinessProbe = await this.generateContainerReadinessProbeSpec(ctx, namespace, deployment, image);
 			// restartPolicy
 			const restartPolicy = deployment.restartPolicy || image.restartPolicy;
-
 
 
 			// create a container spec
@@ -1249,9 +1238,9 @@ module.exports = {
 				args = image.args;
 			}
 			if (args.length == 0) {
-				args = undefined
+				args = undefined;
 			}
-			return args
+			return args;
 		},
 
 		/**
@@ -1320,7 +1309,6 @@ module.exports = {
 					ports.push(spec);
 				}
 			}
-
 
 			if (deployment.ports) {
 				// loop over deployment ports
@@ -1396,7 +1384,6 @@ module.exports = {
 					if (volumeMounts.find(v => v.name == volume.name)) {
 						continue;
 					}
-
 
 					const spec = {
 						name: volume.name,
