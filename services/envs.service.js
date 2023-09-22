@@ -158,16 +158,16 @@ module.exports = {
 						});
 						const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 							id: params.deployment,
-							fields: ['name', 'zone']
+							fields: ['name', 'zone', 'owner']
 						});
-
 						// call provition
 						const entity = await ctx.call(callCMD, {
 							id: params.value,
 							prefix: namespace.name,
 							zone: deployment.zone
-						});
+						}, { meta: { userID: deployment.owner } });
 
+						console.log(entity)
 						// set provtion id as value
 						params.value = entity.id;
 
@@ -179,7 +179,7 @@ module.exports = {
 					//resolve deployment
 					const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 						id: params.deployment,
-						fields: ['name', 'zone', 'routes','vHosts', 'image', 'owner']
+						fields: ['name', 'zone', 'routes', 'vHosts', 'image', 'owner']
 					});
 
 					// resolve deployment image
@@ -424,7 +424,6 @@ module.exports = {
 					const element = provisions[index];
 
 					const callCMD = `v1.${element.key}.pack`;
-
 					this.logger.info(`Packing provisioned ENV ${element.key} for ${params.deployment} at ${callCMD}`)
 
 					// call pack on provisioned env
@@ -528,9 +527,9 @@ module.exports = {
 
 			// if type is provision call deprovision
 			if (env.type == 'provision') {
-				const callCMD = `v1.${env.key}.unprovision`
+				const callCMD = `v1.${env.key}.deprovision`
 
-				this.logger.info(`Packing unprovisioned ENV ${env.key} for ${env.deployment} at ${callCMD}`)
+				this.logger.info(`Packing deprovision ENV ${env.key} for ${env.deployment} at ${callCMD}`)
 
 				await ctx.call(callCMD, {
 					id: env.value

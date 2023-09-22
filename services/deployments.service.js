@@ -60,7 +60,7 @@ module.exports = {
 	 * @type {Object}
 	 */
 	settings: {
-		rest: "v1/k8s/namespaces/:namespace/deployments",
+		rest: "v1/k8s/deployments",
 
 		fields: {
 
@@ -451,6 +451,52 @@ module.exports = {
 				}).then((res) => {
 					return res;
 				});
+			}
+		},
+
+		/**
+		 * get pod top metrics
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} pod top metrics
+		 */
+		top: {
+			rest: {
+				method: "GET",
+				path: "/:id/top"
+			},
+			permissions: ['k8s.deployments.top'],
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				// resolve eployment
+				const deployment = await this.resolveEntities(ctx, { id: params.id });
+
+				// get pods uid
+				const pods = await this.actions.pods({
+					id: deployment.id
+				});
+
+				const metrics = [];
+				// get top metrics
+				for (const pod of pods) {
+					const top = await ctx.call('v1.kube.topPods', {
+						name: pod.metadata.name,
+						namespace: pod.metadata.namespace,
+						cluster: pod.cluster
+					});
+					metrics.push({
+						name: pod.metadata.name,
+						top: top
+					});
+				}
+
+				return metrics;
 			}
 		},
 
@@ -1024,7 +1070,6 @@ module.exports = {
 				}
 			}
 
-			console.log(volumes)
 			// return the volumes
 			return volumes;
 		},

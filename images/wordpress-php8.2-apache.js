@@ -1,7 +1,8 @@
-
 /**
  * This is a definition of the wordpress image.
  * 
+ * wordpress:php8.2-apache
+ * DIGEST:sha256:a4e7aecf85e11d30205ebcc72de0326bbb52043578945a2816775ab4dc257bec
  * 
  * It conforms to the IMAGE_FIELDS in ../fields.js
  */
@@ -9,11 +10,11 @@
 const FIELDS = require("../fields");
 
 module.exports = {
-    name: "wordpress",
+    name: "wordpress-php8-2-apache",
     namespace:"library",
-    tag: "5.2.2-php7.3-apache",
-    digest: "sha256:3d5f8a7e7d0e1d0a9b7b2d6a8d9a0a6a1b2b3b4b5b6b7b8b9b0c1c2c3c4c5c6c7",
-    image: "wordpress:5.2.2-php7.3-apache",
+    tag: "php8.2-apache",
+    digest: "sha256:a4e7aecf85e11d30205ebcc72de0326bbb52043578945a2816775ab4dc257bec",
+    image: "wordpress:php8.2-apache",
     registry: "docker.io",
     repository: "library/wordpress",
     description: "WordPress is open source software you can use to create a beautiful website, blog, or app.",

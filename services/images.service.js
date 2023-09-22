@@ -233,13 +233,16 @@ module.exports = {
 
 					// if not found create image
 					if (!found) {
-						results.push(await this.createEntity(ctx, { ...schema }));
+						results.push(ctx.call('v1.k8s.images.create', schema));
 					} else {
-						results.push(await this.updateEntity(ctx, { id: found.id, ...schema }));
+						results.push(ctx.call('v1.k8s.images.update', {
+							...schema,
+							id: found.id
+						}));
 					}
 				}
 
-				return results;
+				return Promise.all(results);
 			}
 		},
 

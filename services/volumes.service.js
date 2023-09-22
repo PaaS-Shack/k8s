@@ -236,9 +236,6 @@ module.exports = {
 					id: deployment.image,
 				});
 
-
-
-
 				// loop deployment volumes
 				for (const volume of deployment.volumes) {
 					// create volume
@@ -262,7 +259,6 @@ module.exports = {
 					}, options)
 					this.logger.info(`volume ${volume.name} created from image ${image.name}`);
 				}
-
 			}
 		},
 
@@ -297,8 +293,6 @@ module.exports = {
 						this.logger.error(`volume ${volume.name} delete failed`);
 					});
 				}
-
-
 			}
 		},
 	},

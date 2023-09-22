@@ -39,7 +39,7 @@ module.exports = {
     env: [
         {
             key: "MINIO_ACCESS_KEY",
-            type: "secret"
+            type: "username"
         },
         {
             key: "MINIO_SECRET_KEY",

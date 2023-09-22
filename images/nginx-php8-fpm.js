@@ -9,7 +9,7 @@ const FIELDS = require("../fields");
 
 
 module.exports = {
-    name: "tangramor/nginx-php8-fpm",
+    name: "tangramor-nginx-php8-fpm",
     namespace:"tangramor",
     tag: "php8.2.10_node20.6.0",
     digest: "sha256:3d5f8a7e7d0e1d0a9b7b2d6a8d9a0a6a1b2b3b4b5b6b7b8b9b0c1c2c3c4c5c6c7",
@@ -37,11 +37,6 @@ module.exports = {
             name: "nginx-php8-fpm-data",
             type: "persistentVolumeClaim",
             mountPath: "/var/www/html"
-        },
-        {
-            name: "nginx-php8-fpm-config",
-            type: "configMap",
-            mountPath: "/etc/nginx/conf.d"
         }
     ],
     resources: {

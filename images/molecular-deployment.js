@@ -15,7 +15,7 @@ module.exports = {
     image: "registry:2.7.1",
     registry: "docker.io",
     repository: "library/registry",
-    description: "",
+    description: "baisc molecularjs deployment",
     imagePullPolicy: "IfNotPresent",
     imagePullSecrets: [],
     ports: [],
