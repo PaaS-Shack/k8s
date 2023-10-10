@@ -1,7 +1,7 @@
 /**
  * This is a definition of the wordpress image.
  * 
- * docker pull ghcr.io/requarks/wiki:3.0.0-alpha.309
+ * docker pull ghcr.io/requarks/wiki:2
  * 
  * It conforms to the IMAGE_FIELDS in ../fields.js
  */
@@ -11,9 +11,9 @@ const FIELDS = require("../fields");
 module.exports = {
     name: "wikijs-2",
     namespace: "requarks",
-    tag: "3.0.0-alpha.309",
+    tag: "2",
     digest: "sha256:2c5c2d6a0a2e3e6f1e4e2a1b9b2d5e7b8b4f4b9a8e3b9d0b3f4e9b2f4b9a8e3b",
-    image: "ghcr.io/requarks/wiki:3.0.0-alpha.309",
+    image: "ghcr.io/requarks/wiki:2",
     registry: "ghcr.io",
     repository: "requarks/wiki",
     description: "A modern, lightweight and powerful wiki app built on NodeJS, Git and Markdown",
