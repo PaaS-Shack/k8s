@@ -32,8 +32,7 @@ module.exports = {
             type: "provision"
         },
         {
-            key: "DB_TYPE",
-            type: "value",
+            key: "DB_TYPE"
             value: "mysql"
         },
         {
@@ -63,7 +62,6 @@ module.exports = {
         },
         {
             key: "DB_SSL",
-            type: "value",
             value: "false"
         }
     ],
