@@ -59,10 +59,6 @@ module.exports = {
             key: "DB_NAME",
             type: "map",
             value: "MYSQL_DATABASE"
-        },
-        {
-            key: "DB_SSL",
-            value: "false"
         }
     ],
     volumes: [
