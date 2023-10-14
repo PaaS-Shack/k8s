@@ -927,15 +927,30 @@ const DEPLOYMENT_FIELDS = {
         enviroment: {
             type: "array",
             virtual: true,
-            get: ({ entity, ctx }) => ctx.call('v1.k8s.envs.find', {
-                query: {
-                    deployment: this.encodeID(entity._id),
-                    namespace: entity.namespace
-                }
-            }),
+            get: function ({ entity, ctx }) {
+                return ctx.call('v1.k8s.envs.find', {
+                    query: {
+                        deployment: this.encodeID(entity._id),
+                        namespace: entity.namespace
+                    }
+                });
+            }
         },
         // volumes
         volumes: { type: 'array', items: SHORTVULUME_FIELDS, default: [], required: false },
+        // vols
+        vols: {
+            type: "array",
+            virtual: true,
+            get: function ({ entity, ctx }) {
+                return ctx.call('v1.k8s.volumes.find', {
+                    query: {
+                        deployment: this.encodeID(entity._id),
+                        namespace: entity.namespace
+                    }
+                });
+            }
+        },
         // resources
         resources: RESOURCE_FIELDS,
 
