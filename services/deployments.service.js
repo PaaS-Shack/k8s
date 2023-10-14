@@ -124,7 +124,7 @@ module.exports = {
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
-				return await this.createDeploymentSchema(ctx, namespace, deployment, image);//.then((resource) => resource.spec.template.spec);
+				return this.createDeploymentSchema(ctx, namespace, deployment, image);//.then((resource) => resource.spec.template.spec);
 			}
 		},
 

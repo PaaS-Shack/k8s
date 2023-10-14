@@ -42,7 +42,7 @@ module.exports = {
 	 * Service settings
 	 */
 	settings: {
-		rest: "/v1/k8s/namespace/:namespace/deployments/:deployment/envs",// enable rest
+		rest: "/v1/k8s/envs",// enable rest
 
 		fields: {
 
