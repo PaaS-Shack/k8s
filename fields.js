@@ -30,7 +30,7 @@ const VOLUMECONFIGMAP_FIELDS = {
     type: 'object',
     properties: {
         name: { type: 'string', empty: false, required: true },
-        configMapName: { type: 'string', empty: false, required: true },
+        configMapName: { type: 'string', empty: false, required: false },
         items: {
             type: 'array',
             items: {
