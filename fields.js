@@ -373,12 +373,8 @@ const CONFIGMAP_FIELDS = {
         name: { type: 'string', empty: false, required: true },
         data: {
             type: 'object',
-            properties: {
-                username: { type: 'string', empty: false, required: true },
-                password: { type: 'string', empty: false, required: true },
-                email: { type: 'string', empty: false, required: true },
-                server: { type: 'string', empty: false, required: true },
-            }
+            required: false,
+            default: {},
         }
     }
 };
@@ -818,6 +814,8 @@ const IMAGE_FIELDS = {
             type: 'object',
             required: false,
         },
+
+        configMap: CONFIGMAP_FIELDS,
 
         // lables
         labels: LABELS_FIELDS,
