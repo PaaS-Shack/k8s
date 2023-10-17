@@ -1,7 +1,8 @@
 
 
 
-// This function creates a new volume object for the given name, type, mountPath, and optionally subPath and readOnly properties
+// This function creates a new volume object for the given name, type, mountPath, 
+// and optionally subPath and readOnly properties
 // It returns the new volume object
 
 const VOLUMESECRET_FIELDS = {
@@ -108,7 +109,17 @@ const VOLUME_FIELDS = {
         readOnly: { type: 'boolean', default: false, required: false },
 
         size: { type: 'number', min: 0, default: 1024, required: false },
-        accessModes: { type: 'array', items: { type: 'enum', values: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany'], default: 'ReadWriteOnce', required: false }, default: ['ReadWriteOnce'], required: false },
+        accessModes: {
+            type: 'array',
+            items: {
+                type: 'enum',
+                values: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany'],
+                default: 'ReadWriteOnce',
+                required: false
+            },
+            default: ['ReadWriteOnce'],
+            required: false
+        },
 
         secret: VOLUMESECRET_FIELDS,
         configMap: VOLUMECONFIGMAP_FIELDS,
@@ -118,7 +129,16 @@ const VOLUME_FIELDS = {
             type: 'object',
             properties: {
                 name: { type: 'string', empty: false, required: true },
-                type: { type: 'enum', values: ['hostPath', 'nfs', 'iscsi', 'glusterfs', 'rbd', 'cephfs', 'cinder', 'fc', 'flocker', 'flexVolume', 'azureFile', 'vsphereVolume', 'quobyte', 'azureDisk', 'portworxVolume', 'scaleIO', 'local', 'storageos', 'csi'], default: 'hostPath', required: true },
+                type: {
+                    type: 'enum',
+                    values: [
+                        'hostPath', 'nfs', 'iscsi', 'glusterfs',
+                        'rbd', 'cephfs', 'cinder', 'fc', 'flocker',
+                        'flexVolume', 'azureFile', 'vsphereVolume',
+                        'quobyte', 'azureDisk', 'portworxVolume',
+                        'scaleIO', 'local', 'storageos', 'csi'
+                    ], default: 'hostPath', required: true
+                },
                 readOnly: { type: 'boolean', default: false, required: false },
             }
         },
@@ -137,7 +157,12 @@ const VOLUME_FIELDS = {
             type: 'object',
             properties: {
                 path: { type: 'string', empty: false, required: true },
-                type: { type: 'enum', values: ['Directory', 'File', 'Socket', 'CharDevice', 'BlockDevice'], default: 'Directory', required: false },
+                type: {
+                    type: 'enum',
+                    values: ['Directory', 'File', 'Socket', 'CharDevice', 'BlockDevice'],
+                    default: 'Directory',
+                    required: false
+                },
             }
         },
 
@@ -313,8 +338,15 @@ const AFFINITY_FIELDS = {
                                             type: 'object',
                                             properties: {
                                                 key: { type: 'string', empty: false, required: true },
-                                                operator: { type: 'enum', values: ['In', 'NotIn', 'Exists', 'DoesNotExist', 'Gt', 'Lt'], default: 'In', required: true },
-                                                values: { type: 'array', items: { type: 'string', empty: false, required: true } }
+                                                operator: {
+                                                    type: 'enum',
+                                                    values: ['In', 'NotIn', 'Exists', 'DoesNotExist', 'Gt', 'Lt'],
+                                                    default: 'In', required: true
+                                                },
+                                                values: {
+                                                    type: 'array',
+                                                    items: { type: 'string', empty: false, required: true }
+                                                }
                                             }
                                         }
                                     }
@@ -387,7 +419,12 @@ const TOLERATIONS_FIELDS = {
             key: { type: 'string', empty: false, required: true },
             operator: { type: 'enum', values: ['Equal', 'Exists'], default: 'Equal', required: true },
             value: { type: 'string', empty: false, required: true },
-            effect: { type: 'enum', values: ['NoSchedule', 'PreferNoSchedule', 'NoExecute'], default: 'NoSchedule', required: true },
+            effect: {
+                type: 'enum',
+                values: ['NoSchedule', 'PreferNoSchedule', 'NoExecute'],
+                default: 'NoSchedule', 
+                required: true
+            },
         }
     },
     default: [],
@@ -440,7 +477,14 @@ const SECURITYCONTEXT_FIELDS = {
                 type: 'string',
                 empty: false,
                 required: true,
-                values: ['ALL', 'AUDIT_CONTROL', 'AUDIT_WRITE', 'BLOCK_SUSPEND', 'CHOWN', 'DAC_OVERRIDE', 'DAC_READ_SEARCH', 'FOWNER', 'FSETID', 'IPC_LOCK', 'IPC_OWNER', 'KILL', 'LEASE', 'LINUX_IMMUTABLE', 'MAC_ADMIN', 'MAC_OVERRIDE', 'MKNOD', 'NET_ADMIN', 'NET_BIND_SERVICE', 'NET_BROADCAST', 'NET_RAW', 'SETFCAP', 'SETGID', 'SETPCAP', 'SETUID', 'SYS_ADMIN', 'SYS_BOOT', 'SYS_CHROOT', 'SYS_MODULE', 'SYS_NICE', 'SYS_PACCT', 'SYS_PTRACE', 'SYS_RAWIO', 'SYS_RESOURCE', 'SYS_TIME', 'SYS_TTY_CONFIG', 'SYSLOG', 'WAKE_ALARM']
+                values: [
+                    'ALL', 'AUDIT_CONTROL', 'AUDIT_WRITE', 'BLOCK_SUSPEND', 'CHOWN', 'DAC_OVERRIDE',
+                    'DAC_READ_SEARCH', 'FOWNER', 'FSETID', 'IPC_LOCK', 'IPC_OWNER', 'KILL', 'LEASE',
+                    'LINUX_IMMUTABLE', 'MAC_ADMIN', 'MAC_OVERRIDE', 'MKNOD', 'NET_ADMIN', 'NET_BIND_SERVICE',
+                    'NET_BROADCAST', 'NET_RAW', 'SETFCAP', 'SETGID', 'SETPCAP', 'SETUID', 'SYS_ADMIN',
+                    'SYS_BOOT', 'SYS_CHROOT', 'SYS_MODULE', 'SYS_NICE', 'SYS_PACCT', 'SYS_PTRACE',
+                    'SYS_RAWIO', 'SYS_RESOURCE', 'SYS_TIME', 'SYS_TTY_CONFIG', 'SYSLOG', 'WAKE_ALARM'
+                ]
             },
             default: [],
             required: false
@@ -451,7 +495,14 @@ const SECURITYCONTEXT_FIELDS = {
                 type: 'string',
                 empty: false,
                 required: true,
-                values: ['ALL', 'AUDIT_CONTROL', 'AUDIT_WRITE', 'BLOCK_SUSPEND', 'CHOWN', 'DAC_OVERRIDE', 'DAC_READ_SEARCH', 'FOWNER', 'FSETID', 'IPC_LOCK', 'IPC_OWNER', 'KILL', 'LEASE', 'LINUX_IMMUTABLE', 'MAC_ADMIN', 'MAC_OVERRIDE', 'MKNOD', 'NET_ADMIN', 'NET_BIND_SERVICE', 'NET_BROADCAST', 'NET_RAW', 'SETFCAP', 'SETGID', 'SETPCAP', 'SETUID', 'SYS_ADMIN', 'SYS_BOOT', 'SYS_CHROOT', 'SYS_MODULE', 'SYS_NICE', 'SYS_PACCT', 'SYS_PTRACE', 'SYS_RAWIO', 'SYS_RESOURCE', 'SYS_TIME', 'SYS_TTY_CONFIG', 'SYSLOG', 'WAKE_ALARM']
+                values: [
+                    'ALL', 'AUDIT_CONTROL', 'AUDIT_WRITE', 'BLOCK_SUSPEND', 'CHOWN', 'DAC_OVERRIDE',
+                    'DAC_READ_SEARCH', 'FOWNER', 'FSETID', 'IPC_LOCK', 'IPC_OWNER', 'KILL', 'LEASE',
+                    'LINUX_IMMUTABLE', 'MAC_ADMIN', 'MAC_OVERRIDE', 'MKNOD', 'NET_ADMIN', 'NET_BIND_SERVICE',
+                    'NET_BROADCAST', 'NET_RAW', 'SETFCAP', 'SETGID', 'SETPCAP', 'SETUID', 'SYS_ADMIN',
+                    'SYS_BOOT', 'SYS_CHROOT', 'SYS_MODULE', 'SYS_NICE', 'SYS_PACCT', 'SYS_PTRACE', 'SYS_RAWIO',
+                    'SYS_RESOURCE', 'SYS_TIME', 'SYS_TTY_CONFIG', 'SYSLOG', 'WAKE_ALARM'
+                ]
             },
             default: [],
             required: false
