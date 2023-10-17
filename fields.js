@@ -952,6 +952,8 @@ const DEPLOYMENT_FIELDS = {
         // resources
         resources: RESOURCE_FIELDS,
 
+        configMap: CONFIGMAP_FIELDS,
+
         //lables
         labels: LABELS_FIELDS,
         annotations: LABELS_FIELDS,
