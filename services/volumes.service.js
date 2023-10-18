@@ -485,8 +485,6 @@ module.exports = {
 		 * @returns {Promise}
 		 */
 		async createConfigMap(ctx, namespace, volume, deployment) {
-
-
 			let configMapData = {
 
 			}
@@ -498,8 +496,6 @@ module.exports = {
 			if (deployment.configMap) {
 				configMapData = Object.assign(configMapData, deployment.configMap.data);
 			}
-
-
 
 			const configMap = {
 				apiVersion: "v1",
@@ -513,7 +509,6 @@ module.exports = {
 				},
 				data: configMapData
 			}
-			console.log(configMap)
 
 			await ctx.call('v1.kube.createNamespacedConfigMap', {
 				namespace: namespace.name,

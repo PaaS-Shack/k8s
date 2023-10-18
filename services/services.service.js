@@ -186,7 +186,6 @@ module.exports = {
 			// resolve image
 			const image = await ctx.call('v1.k8s.images.resolve', { id: deployment.image });
 
-
 			// resolve service
 			const service = await this.findEntity(ctx, {
 				query: {
@@ -323,7 +322,7 @@ module.exports = {
 					externalIPs: service.externalIPs,
 
 				}
-			}
+			};
 
 			// create the service
 			const createdService = await ctx.call('v1.kube.createNamespacedService', {
@@ -349,11 +348,13 @@ module.exports = {
 		async processServiceRemove(ctx, service) {
 			// keep track of user id for ownership
 			const options = { meta: { userID: service.owner } };
+
 			// resolve namespace
 			const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 				id: service.namespace,
 				fields: ['name', 'cluster']
 			}, options);
+			
 			// resolve deployment
 			const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 				id: service.deployment,

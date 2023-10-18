@@ -11,6 +11,7 @@ const FIELDS = require('../fields');
 
 /**
  * Deployment enviroment variables service
+ * 
  */
 module.exports = {
 	/**
@@ -45,9 +46,7 @@ module.exports = {
 		rest: "/v1/k8s/envs",// enable rest
 
 		fields: {
-
 			...FIELDS.ENVS_FIELDS.properties,// inject env fields
-
 
 			...DbService.FIELDS,// inject dbservice fields
 		},
@@ -74,9 +73,46 @@ module.exports = {
 	 */
 
 	actions: {
+		/**
+		 * Resolve an entity by key and scope
+		 * 
+		 * @actions
+		 * @param {String} key - key of env
+		 * @param {String} scope - scope of env
+		 * @param {String} deployment - Deployment id
+		 * @param {String} namespace - Namespace id
+		 * 
+		 * @return {Promise} Found entity
+		 */
+		resolveENV: {
+			params: {
+				key: { type: 'string', empty: false, required: true, optional: false },
+				scope: { type: 'enum', values: ['RUN_TIME', 'BUILD_TIME', 'RUN_AND_BUILD_TIME'], default: 'RUN_TIME', required: false, optional: true },
 
+				deployment: { type: "string", min: 3, optional: false },
+				namespace: { type: "string", min: 3, optional: false }
+			},
+			permissions: ['k8s.envs.resolve'],
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
 
+				// find entity
+				let found = await this.findEntity(null, {
+					query: {
+						deployment: params.deployment,
+						namespace: params.namespace,
+						key: params.key,
+						scope: params.scope
+					}
+				});
 
+				if (found) {
+					return found;
+				}
+
+				throw new MoleculerClientError(`Entity '${params.key}' not found!`, 404);
+			}
+		},
 		/**
 		 * Create a new entity.
 		 * 
@@ -145,7 +181,6 @@ module.exports = {
 					this.logger.info(`Generating secret ENV ${params.key} for ${params.deployment}`);
 				} else if (params.type == 'provision') {
 					// if type is provision make the provitions call if not called
-
 					const callCMD = `v1.${params.key}.provision`
 
 					if (!params.called) {
@@ -167,7 +202,6 @@ module.exports = {
 							zone: deployment.zone
 						}, { meta: { userID: deployment.owner } });
 
-						console.log(entity)
 						// set provtion id as value
 						params.value = entity.id;
 
@@ -235,7 +269,6 @@ module.exports = {
 						id: params.deployment,
 						fields: ['name']
 					});
-
 
 					// set value as deployment name
 					params.value = deployment.name;
@@ -455,7 +488,7 @@ module.exports = {
 					}
 				}
 
-				return Object.assign({}, envs, mapScope)
+				return Object.assign({}, envs, mapScope);
 			}
 		},
 
@@ -499,15 +532,25 @@ module.exports = {
 				});
 
 				// init deployment envs
-				const promises = await this.initDeploymentEnvs(ctx, namespace, deployment, image);
+				await this.initDeploymentEnvs(ctx, namespace, deployment, image);
 
 				// return envs
-				return this.findEntities(ctx, {
+				const result = await this.findEntities(ctx, {
 					query: {
 						namespace: namespace.id,
 						deployment: deployment.id
 					}
 				});
+
+				// patch config map if needed
+				if (result.length == 0) {
+					await this.actions.rePatchConfigMap({
+						namespace: namespace.id,
+						deployment: deployment.id
+					});
+				}
+
+				return result;
 			}
 		},
 	},

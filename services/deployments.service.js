@@ -151,14 +151,11 @@ module.exports = {
 				const deployment = await this.resolveEntities(ctx, { id: params.id });
 
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
-
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
 				return this.applyDeployment(ctx, namespace, deployment, image);
 			}
 		},
-
-
 
 		/**
 		 * Get namespace status
@@ -184,8 +181,6 @@ module.exports = {
 
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace },);
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
-
-
 
 				const resource = await ctx.call("v1.kube.readNamespacedDeployment", {
 					name: deployment.name,
@@ -513,7 +508,6 @@ module.exports = {
 				const deployment = await this.resolveEntities(ctx, { id: params.id });
 
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
-
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
 				return this.createDeployment(ctx, namespace, deployment, image);
@@ -721,7 +715,6 @@ module.exports = {
 			// deployment progress deadline seconds
 			const progressDeadlineSeconds = deployment.progressDeadlineSeconds || image.progressDeadlineSeconds;
 
-
 			// create a spec
 			const spec = {
 				replicas: deployment.replicas,
@@ -832,6 +825,7 @@ module.exports = {
 				'k8s.one-host.ca/deployment': deployment.id,
 				'k8s.one-host.ca/image': deployment.image,
 			};
+
 			if (deployment.build) {
 				annotations['k8s.one-host.ca/build'] = deployment.build;
 			}
@@ -1105,6 +1099,7 @@ module.exports = {
 					defaultMode: volume.configMap.defaultMode,
 					optional: volume.configMap.optional,
 				}
+
 				spec.configMap = ConfigMapVolumeSource;
 			} else if (volume.type == 'persistentVolumeClaim') {
 				let claimName = `${volume.name}-claim`;
@@ -1118,7 +1113,7 @@ module.exports = {
 					readOnly: !!volume.persistentVolumeClaim?.readOnly
 				};
 			}
-			console.log(spec, volume)
+
 			// return the spec
 			return spec;
 
@@ -1154,7 +1149,6 @@ module.exports = {
 			// restartPolicy
 			const restartPolicy = deployment.restartPolicy || image.restartPolicy;
 
-
 			// create a container spec
 			const spec = {
 				name: image.name,
@@ -1174,7 +1168,6 @@ module.exports = {
 				}],
 				restartPolicy,
 			};
-
 
 			// return the spec
 			return spec;
@@ -1307,7 +1300,6 @@ module.exports = {
 				for (const port of image.ports) {
 					// create a port spec
 					const spec = await this.generateContainerPortSpec(ctx, namespace, deployment, image, port);
-
 					// add the spec to the ports
 					ports.push(spec);
 				}
@@ -1318,7 +1310,6 @@ module.exports = {
 				for (const port of deployment.ports) {
 					// create a port spec
 					const spec = await this.generateContainerPortSpec(ctx, namespace, deployment, image, port);
-
 					// add the spec to the ports
 					ports.push(spec);
 				}
@@ -1488,9 +1479,22 @@ module.exports = {
 			return metadata;
 		}
 	},
-	created() {
 
-	}
+	/**
+	 * service created lifecycle event handler
+	 */
+	created() { },
+
+	/**
+	 * service started lifecycle event handler
+	 */
+	async started() { },
+
+	/**
+	 * service stopped lifecycle event handler
+	 */
+	async stopped() { },
+
 
 
 }

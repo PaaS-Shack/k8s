@@ -217,7 +217,7 @@ module.exports = {
                     const port = servicePorts[index];
                     let vertualHost = vHost;
 
-                    // 
+                    // resolve subdomain if exists and add to vHost
                     if (port.subdomain) {
                         vertualHost = `${port.subdomain}.${vHost}`;
                     } else {
