@@ -170,6 +170,7 @@ module.exports = {
 				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 					id: volume.namespace,
 				}, options);
+				
 				//resolve deployment
 				const deployment = volume.deployment && await ctx.call('v1.k8s.deployments.resolve', {
 					id: volume.deployment,
