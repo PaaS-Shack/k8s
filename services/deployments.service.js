@@ -124,7 +124,7 @@ module.exports = {
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
-				return this.createDeploymentSchema(ctx, namespace, deployment, image);//.then((resource) => resource.spec.template.spec);
+				return this.createDeploymentSchema(ctx, namespace, deployment, image)//.then((resource) => resource.spec.template.spec);
 			}
 		},
 
@@ -1098,11 +1098,14 @@ module.exports = {
 					defaultMode: volume.secret.defaultMode
 				};
 			} else if (volume.type == 'configMap') {
-				// spec.configMap = {
-				// 	name: volume.configMap.name,
-				// 	items: volume.configMap.items,
-				// 	defaultMode: volume.configMap.defaultMode
-				// };
+				const ConfigMapVolumeSource = {
+					name: volume.name,
+					configMap: volume.configMap.name,
+					items: volume.configMap.items,
+					defaultMode: volume.configMap.defaultMode,
+					optional: volume.configMap.optional,
+				}
+				spec.configMap = ConfigMapVolumeSource;
 			} else if (volume.type == 'persistentVolumeClaim') {
 				let claimName = `${volume.name}-claim`;
 
@@ -1115,7 +1118,7 @@ module.exports = {
 					readOnly: !!volume.persistentVolumeClaim?.readOnly
 				};
 			}
-
+			console.log(spec, volume)
 			// return the spec
 			return spec;
 
@@ -1369,6 +1372,11 @@ module.exports = {
 						name: volume.name,
 						mountPath: volume.mountPath,
 					};
+
+					// subPath is optional
+					if (volume.subPath) {
+						spec.subPath = volume.subPath;
+					}
 
 					// add the spec to the volume mounts
 					volumeMounts.push(spec);

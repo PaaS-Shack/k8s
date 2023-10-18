@@ -173,6 +173,7 @@ module.exports = {
 				//resolve deployment
 				const deployment = volume.deployment && await ctx.call('v1.k8s.deployments.resolve', {
 					id: volume.deployment,
+					populate: 'image'
 				}, options);
 
 				if (volume.type == 'persistentVolumeClaim') {
@@ -181,7 +182,20 @@ module.exports = {
 				} else if (volume.type == 'persistentVolume') {
 					// create pv
 					const createdPV = await this.createPV(ctx, namespace, volume, deployment);
+				} else if (volume.type == 'emptyDir') {
+					// create emptyDir
+					const createdVolume = await this.createEmptyDir(ctx, namespace, volume, deployment);
+				} else if (volume.type == 'hostPath') {
+					// create hostPath
+					const createdVolume = await this.createHostPath(ctx, namespace, volume, deployment);
+				} else if (volume.type == 'configMap') {
+					// create configMap
+					const createdVolume = await this.createConfigMap(ctx, namespace, volume, deployment);
+				} else if (volume.type == 'secret') {
+					// create secret
+					const createdVolume = await this.createSecret(ctx, namespace, volume, deployment);
 				}
+
 				this.logger.info(`volume ${volume.name} created`)
 
 			}
@@ -213,6 +227,9 @@ module.exports = {
 				} else if (volume.type == 'persistentVolume') {
 					// delete pv
 					const deletedPV = await this.deletePV(ctx, namespace, volume, deployment);
+				} else if (volume.type == 'configMap') {
+					// delete configMap
+					const deletedVolume = await this.deleteConfigMap(ctx, namespace, volume, deployment);
 				}
 
 				this.logger.info(`volume ${volume.name} deleted`);
@@ -468,7 +485,41 @@ module.exports = {
 		 * @returns {Promise}
 		 */
 		async createConfigMap(ctx, namespace, volume, deployment) {
-			const volumeName = volume.volumeName;
+
+
+			let configMapData = {
+
+			}
+
+			if (deployment.image.configMap) {
+				configMapData = Object.assign(configMapData, deployment.image.configMap.data);
+			}
+
+			if (deployment.configMap) {
+				configMapData = Object.assign(configMapData, deployment.configMap.data);
+			}
+
+
+
+			const configMap = {
+				apiVersion: "v1",
+				kind: "ConfigMap",
+				metadata: {
+					name: volume.name,
+					namespace: namespace.name,
+					labels: {
+						app: deployment ? deployment.name : volume.name,
+					}
+				},
+				data: configMapData
+			}
+			console.log(configMap)
+
+			await ctx.call('v1.kube.createNamespacedConfigMap', {
+				namespace: namespace.name,
+				cluster: namespace.cluster,
+				body: configMap
+			});
 
 			const ConfigMapVolumeSource = {
 				name: volume.name,
@@ -478,7 +529,7 @@ module.exports = {
 			}
 
 			const Volume = {
-				name: volumeName,
+				name: volume.name,
 				configMap: ConfigMapVolumeSource
 			}
 
@@ -497,6 +548,11 @@ module.exports = {
 		 */
 		async deleteConfigMap(ctx, namespace, volume, deployment) {
 
+			await ctx.call('v1.kube.deleteNamespacedConfigMap', {
+				namespace: namespace.name,
+				cluster: namespace.cluster,
+				name: volume.name
+			});
 		},
 
 		/**
