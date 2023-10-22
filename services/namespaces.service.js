@@ -88,6 +88,38 @@ module.exports = {
 		},
 
 		/**
+		 * test for name availability
+		 * 
+		 * @actions
+		 * @param {String} name - namespace name
+		 * 
+		 * @returns {Promise} availability
+		 */
+		available: {
+			rest: {
+				method: "GET",
+				path: "/available/:name"
+			},
+			permissions: ['k8s.namespaces.available'],
+			params: {
+				name: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				// find namespace by name
+				const namespace = await this.findByName(params.name);
+
+				// if namespace found, return false
+				if (namespace)
+					return false;
+
+				// return true
+				return true;
+			}
+		},
+
+		/**
 		 * Get namespace status
 		 * 
 		 * @actions
@@ -244,6 +276,7 @@ module.exports = {
 		 * @param {Object} resource
 		 */
 		async transformResource(ctx, resource) {
+			return resource.status;
 			return {
 				spec: resource.spec,
 				status: resource.status,
