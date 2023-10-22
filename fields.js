@@ -1171,7 +1171,7 @@ const NAMESPACE_FIELDS = {
             type: 'string',
             required: true,
             populate: {
-                action: 'v1.k8s.resourceQuotas.resolve',
+                action: 'v1.k8s.resourcequotas.resolve',
             }
         },
         domain: {
