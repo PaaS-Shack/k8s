@@ -170,7 +170,7 @@ module.exports = {
 				const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
 					id: volume.namespace,
 				}, options);
-				
+
 				//resolve deployment
 				const deployment = volume.deployment && await ctx.call('v1.k8s.deployments.resolve', {
 					id: volume.deployment,
@@ -249,6 +249,14 @@ module.exports = {
 					id: deployment.namespace,
 				}, options);
 
+				// nfs enabled
+				const nfsEnabled = this.config['k8s.volumes.nfs.enabled'];
+				let nfs = {
+					server: this.config['k8s.volumes.nfs.server'],
+					path: this.config['k8s.volumes.nfs.path'],
+					readonly: this.config['k8s.volumes.nfs.readonly'],
+				};
+
 				//resolve image
 				const image = await ctx.call('v1.k8s.images.resolve', {
 					id: deployment.image,
@@ -257,12 +265,19 @@ module.exports = {
 				// loop deployment volumes
 				for (const volume of deployment.volumes) {
 					// create volume
-					const createdVolume = await ctx.call('v1.k8s.volumes.create', {
+					const config = {
 						namespace: namespace.id,
 						deployment: deployment.id,
 						...volume,
-					}, options)
-					this.logger.info(`volume ${volume.name} created from deployment ${deployment.name}`);
+					};
+
+					// check for nfs
+					if (nfsEnabled && !volume.nfs && volume.type == 'persistentVolumeClaim') {
+						config.nfs = nfs;
+					}
+
+					const createdVolume = await ctx.call('v1.k8s.volumes.create', config, options)
+					this.logger.info(`volume ${volume.name} created from deployment ${deployment.name}`,createdVolume);
 				}
 
 				// loop image volumes
@@ -270,12 +285,20 @@ module.exports = {
 					// create volume
 					const found = deployment.volumes.find((v) => v.name == volume.name)
 					if (found) continue;
-					const createdVolume = await ctx.call('v1.k8s.volumes.create', {
+
+					const config = {
 						namespace: namespace.id,
 						deployment: deployment.id,
 						...volume,
-					}, options)
-					this.logger.info(`volume ${volume.name} created from image ${image.name}`);
+					};
+
+					// check for nfs
+					if (nfsEnabled && !volume.nfs && volume.type == 'persistentVolumeClaim') {
+						config.nfs = nfs;
+					}
+
+					const createdVolume = await ctx.call('v1.k8s.volumes.create', config, options)
+					this.logger.info(`volume ${volume.name} created from image ${image.name}`,createdVolume);
 				}
 			}
 		},
@@ -619,9 +642,6 @@ module.exports = {
 					}
 				},
 				spec: {
-					storageClassName: volume.storageClass,
-
-					volumeName: volumeName,
 
 					accessModes: volume.accessModes,
 
@@ -631,6 +651,20 @@ module.exports = {
 						}
 					}
 				}
+			}
+
+			// check for storage class
+			if (volume.storageClass) {
+				PersistentVolumeClaim.spec.storageClassName = volume.storageClass;
+			} else {
+				PersistentVolumeClaim.spec.storageClassName = 'default';
+			}
+
+			// check for nfs
+			if (volume.nfs) {
+				await this.createPV(ctx, namespace, volume, deployment);
+				PersistentVolumeClaim.spec.volumeName = volume.name;
+				PersistentVolumeClaim.spec.storageClassName = '';
 			}
 
 			return ctx.call('v1.kube.createNamespacedPersistentVolumeClaim', {
@@ -690,6 +724,15 @@ module.exports = {
 						storage: `${volume.size}Mi`
 					},
 					persistentVolumeReclaimPolicy: volume.reclaimPolicy,
+				}
+			}
+
+			// check for nfs
+			if (volume.nfs) {
+				PersistentVolume.spec.nfs = {
+					server: volume.nfs.server,
+					path: volume.nfs.path,
+					readonly: volume.nfs.readonly,
 				}
 			}
 
