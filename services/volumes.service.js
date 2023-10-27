@@ -609,11 +609,14 @@ module.exports = {
 		 * @returns {Promise}
 		 */
 		async createPVC(ctx, namespace, volume, deployment) {
-			const claimName = `${volume.name}-claim`;
+			const claimName = `${namespace.name}-${deployment ? deployment.name : 'shared'}-${volume.name}-claim`;
 
 			const volumeName = volume.volumeName;
 
 			const annotations = {
+				"k8s.one-host.ca/namespace": namespace.id,
+				"k8s.one-host.ca/deployment": deployment ? deployment.id : null,
+				"k8s.one-host.ca/volume": volume.id,
 				"k8s.one-host.ca/storage-zone": deployment.zone,
 				"k8s.one-host.ca/storage-prefix": namespace.name,
 			};
@@ -646,6 +649,11 @@ module.exports = {
 				PersistentVolumeClaim.spec.storageClassName = volume.storageClass;
 			} else {
 				PersistentVolumeClaim.spec.storageClassName = 'default';
+			}
+
+			// check for claim name
+			if (volume.persistentVolumeClaim && volume.persistentVolumeClaim.claimName) {
+				PersistentVolumeClaim.spec.volumeName = volume.persistentVolumeClaim.claimName;
 			}
 
 			return ctx.call('v1.kube.createNamespacedPersistentVolumeClaim', {
