@@ -1108,7 +1108,7 @@ module.exports = {
 
 				spec.configMap = ConfigMapVolumeSource;
 			} else if (volume.type == 'persistentVolumeClaim') {
-				let claimName = `${volume.name}-claim`;
+				let claimName = `${namespace.name}-${deployment.name}-${volume.name}-claim`;
 
 				if (volume.persistentVolumeClaim) {
 					claimName = volume.persistentVolumeClaim.claimName;
