@@ -675,7 +675,7 @@ module.exports = {
 		 */
 		async deletePVC(ctx, namespace, volume, deployment) {
 
-			const claimName = `${volume.name}-claim`
+			const claimName = `${namespace.name}-${deployment ? deployment.name : 'shared'}-${volume.name}-claim`;
 
 			return ctx.call('v1.kube.deleteNamespacedPersistentVolumeClaim', {
 				namespace: namespace.name,
