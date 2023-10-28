@@ -88,7 +88,8 @@ module.exports = {
 
 		// default init config settings
 		config: {
-
+			"k8s.deployments.prometheus": true,
+			"k8s.deployments.prometheus.url": "https://prom.one-host.ca",
 		}
 	},
 
@@ -300,6 +301,11 @@ module.exports = {
 
 				const deployment = await this.resolveEntities(ctx, { id: params.id });
 
+				// check if the deployment exists
+				if (!deployment) {
+					throw new MoleculerClientError("Deployment not found", 404, "", [{ field: "id", message: "not found" }]);
+				}
+
 				const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: deployment.namespace });
 				const image = await ctx.call("v1.k8s.images.resolve", { id: deployment.image });
 
@@ -468,16 +474,16 @@ module.exports = {
 				});
 
 				const metrics = [];
+
 				// get top metrics
 				for (const pod of pods) {
-					const top = await ctx.call('v1.kube.topPods', {
-						name: pod.metadata.name,
-						namespace: pod.metadata.namespace,
-						cluster: pod.cluster
+					const namespace = await ctx.call("v1.k8s.namespaces.resolve", { id: pod.metadata.namespace });
+					const top = await ctx.call('v1.kube.top', {
+						uid: pod.metadata.uid
 					});
 					metrics.push({
 						name: pod.metadata.name,
-						top: top
+						top
 					});
 				}
 
@@ -1488,7 +1494,9 @@ module.exports = {
 	/**
 	 * service started lifecycle event handler
 	 */
-	async started() { },
+	async started() {
+
+	},
 
 	/**
 	 * service stopped lifecycle event handler
