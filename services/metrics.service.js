@@ -622,7 +622,7 @@ module.exports = {
     started() {
         if (this.config["k8s.metrics.enabled"]) {
             this.prom = new PrometheusDriver({
-                endpoint: this.settings.config["k8s.metrics.endpoint"],
+                endpoint: this.config["k8s.metrics.endpoint"],
             });
         }
     }
