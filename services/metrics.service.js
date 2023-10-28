@@ -80,33 +80,49 @@ module.exports = {
                 deployment: { type: "string", optional: false },
             },
             async handler(ctx) {
-                const deployment = ctx.params.deployment;
-                console.log(deployment)
-                // resolve deployment pods
-                const pods = await ctx.call("v1.k8s.deployments.pods", {
-                    id: deployment
-                });
+                const id = ctx.params.deployment;
+
+                // resolve deployment
+                const deployment = await ctx.call("v1.k8s.deployments.get", { id });
+                //resolve namespace
+                const namespace = await ctx.call("v1.k8s.namespaces.get", { id: deployment.namespace });
 
                 // get the metrics for each pod
-                const metrics = [];
+                const metrics = {
+                    cpu: 0,
+                    memory: 0,
+                    tx: 0,
+                    rx: 0,
+                };
 
-                for (let i = 0; i < pods.length; i++) {
-                    const pod = pods[i];
-                    const top = {
-                        cpu: await this.instant(`sum(rate(container_cpu_usage_seconds_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`),
-                        memory: await this.instant(`sum(container_memory_working_set_bytes{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}) by (pod,namespace)`)
-                            .then((res) => {// convert to MB
-                                return res.map((item) => {
-                                    item.value = item.value / 1024 / 1024;
-                                    return item;
-                                });
-                            }),
-                        tx: await this.instant(`sum(rate(container_network_transmit_bytes_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`),
-                        rx: await this.instant(`sum(rate(container_network_receive_bytes_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`),
+                const promisses = [];
 
-                    }
-                    metrics.push(top);
-                }
+                // query avrage memory usage for deployment
+                const cpuQuery = `avg(rate(container_cpu_usage_seconds_total{pod=~"${deployment.name}-.*",namespace="${namespace.name}"}[1m])) by (pod,namespace)`;
+
+                // query avrage memory usage for deployment
+                const memoryQuery = `avg(container_memory_working_set_bytes{pod=~"${deployment.name}-.*",namespace="${namespace.name}"}) by (pod,namespace)`;
+
+                // query network usage tx rx
+                const txQuery = `avg(rate(container_network_transmit_bytes_total{pod=~"${deployment.name}-.*",namespace="${namespace.name}"}[1m])) by (pod,namespace)`;
+                const rxQuery = `avg(rate(container_network_receive_bytes_total{pod=~"${deployment.name}-.*",namespace="${namespace.name}"}[1m])) by (pod,namespace)`;
+
+
+                promisses.push(this.instant(cpuQuery));
+                promisses.push(this.instant(memoryQuery));
+                promisses.push(this.instant(txQuery));
+                promisses.push(this.instant(rxQuery));
+
+                const [cpu, memory, tx, rx] = await Promise.all(promisses);
+
+                // convert to milli cores
+                metrics.cpu = Number((cpu * 1000).toFixed(2));
+                // convert to MB
+                metrics.memory =Number(( memory / 1024 / 1024).toFixed(2));
+                // convert to KB
+                metrics.tx = Number((tx / 1024).toFixed(2));
+                metrics.rx = Number((rx / 1024).toFixed(2));
+
 
                 return metrics;
             }
@@ -589,18 +605,16 @@ module.exports = {
 
             return await this.prom.instantQuery(query)
                 .then((res) => {
+                    console.log(res)
                     // loop through the results and format them
                     let results = [];
                     for (let i = 0; i < res.result.length; i++) {
                         let result = res.result[i];
                         let metric = result.metric.labels;
                         let value = result?.value.value
-                        results.push({
-                            metric: metric,
-                            value: value,
-                        });
+                        return value;
                     }
-                    return results;
+                    return 0;
                 })
         },
     },
@@ -608,7 +622,7 @@ module.exports = {
     started() {
         if (this.config["k8s.metrics.enabled"]) {
             this.prom = new PrometheusDriver({
-                endpoint: this.config["k8s.metrics.endpoint"],
+                endpoint: this.settings.config["k8s.metrics.endpoint"],
             });
         }
     }
