@@ -272,10 +272,16 @@ module.exports = {
 				const query = {
 					kind: 'Event',
 					'metadata.namespace': namespace.name,
-					'metadata.involvedObject.uid': deployment.uid,
+					
 				}
 
-				return ctx.call('v1.kube.find', query);
+				return ctx.call('v1.kube.find', query)
+					.then((res) => {
+						// filter events by deployment
+						return res.filter((event) => {
+							return event.involvedObject.name.includes(deployment.name);
+						});
+					});
 			}
 		},
 
