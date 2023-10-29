@@ -247,7 +247,7 @@ module.exports = {
 			// create a deployment labels spec
 
 			const labels = {
-				app: deployment.name,
+
 			};
 
 			// loop over image labels
@@ -255,6 +255,8 @@ module.exports = {
 				// add the label to the labels
 				labels[label.key] = label.value;
 			}
+
+			labels.app = deployment.name;
 
 			// loop over deployment labales
 			for (const label of deployment.labels) {
@@ -354,7 +356,7 @@ module.exports = {
 				id: service.namespace,
 				fields: ['name', 'cluster']
 			}, options);
-			
+
 			// resolve deployment
 			const deployment = await ctx.call('v1.k8s.deployments.resolve', {
 				id: service.deployment,
