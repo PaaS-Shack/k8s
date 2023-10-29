@@ -793,7 +793,7 @@ module.exports = {
 			// create a deployment labels spec
 
 			const labels = {
-				app: deployment.name,
+
 			};
 
 			// loop over image labels
@@ -801,6 +801,8 @@ module.exports = {
 				// add the label to the labels
 				labels[label.key] = label.value;
 			}
+
+			labels.app = deployment.name;
 
 			// loop over deployment labales
 			for (const label of deployment.labels) {
