@@ -159,7 +159,7 @@ module.exports = {
                     const pod = pods[i];
                     const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                     const end = new Date();
-                    const step = 1 * 60 * 60; // 1 point every 6 hours
+                    const step = 15 * 60; // 1 point every 15 minutes
                     // query avrage memory usage
                     const query = `avg(container_memory_working_set_bytes{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}) by (pod,namespace)`;
                     const result = await this.prom.rangeQuery(query, start, end, step)
@@ -209,7 +209,7 @@ module.exports = {
                     const pod = pods[i];
                     const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                     const end = new Date();
-                    const step = 1 * 60 * 60; // 1 point every 6 hours
+                    const step = 15 * 60; // 1 point every 15 minutes
                     // query avrage memory usage
                     const query = `avg(rate(container_cpu_usage_seconds_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`;
                     const result = await this.prom.rangeQuery(query, start, end, step)
@@ -262,7 +262,7 @@ module.exports = {
                     const pod = pods[i];
                     const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                     const end = new Date();
-                    const step = 1 * 60 * 60; // 1 point every 6 hours
+                    const step = 15 * 60; // 1 point every 15 minutes
                     // query avrage memory usage
                     const txQuery = `avg(rate(container_network_transmit_bytes_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`;
                     const rxQuery = `avg(rate(container_network_receive_bytes_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`;
@@ -314,7 +314,7 @@ module.exports = {
 
                 const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                 const end = new Date();
-                const step = 1 * 60 * 60; // 1 point every 6 hours
+                const step = 15 * 60; // 1 point every 15 minutes
                 // query avrage memory usage
                 const query = `avg(container_memory_working_set_bytes{namespace="${namespace.name}"}) by (namespace)`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
@@ -361,7 +361,7 @@ module.exports = {
 
                 const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                 const end = new Date();
-                const step = 1 * 60 * 60; // 1 point every 6 hours
+                const step = 15 * 60; // 1 point every 15 minutes
                 // query avrage memory usage
                 const query = `avg(rate(container_cpu_usage_seconds_total{namespace="${namespace.name}"}[1m])) by (namespace)`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
@@ -404,7 +404,7 @@ module.exports = {
 
                 const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                 const end = new Date();
-                const step = 1 * 60 * 60; // 1 point every 6 hours
+                const step = 15 * 60; // 1 point every 15 minutes
                 // query network usage tx rx
                 const txQuery = `avg(rate(container_network_transmit_bytes_total{namespace="${namespace.name}"}[1m])) by (namespace)`;
                 const rxQuery = `avg(rate(container_network_receive_bytes_total{namespace="${namespace.name}"}[1m])) by (namespace)`;
@@ -444,7 +444,7 @@ module.exports = {
             async handler(ctx) {
                 const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                 const end = new Date();
-                const step = 1 * 60 * 60; // 1 point every 6 hours
+                const step = 15 * 60; // 1 point every 15 minutes
                 // query avrage memory usage
                 const query = `sum(container_memory_working_set_bytes)`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
@@ -481,7 +481,7 @@ module.exports = {
             async handler(ctx) {
                 const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                 const end = new Date();
-                const step = 1 * 60 * 60; // 1 point every 6 hours
+                const step = 15 * 60; // 1 point every 15 minutes
                 // query avrage memory usage
                 const query = `sum(rate(container_cpu_usage_seconds_total[1m]))`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
@@ -513,7 +513,7 @@ module.exports = {
             async handler(ctx) {
                 const start = new Date().getTime() - 24 * 60 * 60 * 1000;
                 const end = new Date();
-                const step = 1 * 60 * 60; // 1 point every 6 hours
+                const step = 15 * 60; // 1 point every 15 minutes
                 // query network usage tx rx
                 const txQuery = `sum(rate(container_network_transmit_bytes_total[1m]))`;
                 const rxQuery = `sum(rate(container_network_receive_bytes_total[1m]))`;
