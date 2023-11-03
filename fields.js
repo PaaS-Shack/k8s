@@ -402,7 +402,7 @@ const SECRET_FIELDS = {
 const CONFIGMAP_FIELDS = {
     type: 'object',
     properties: {
-        name: { type: 'string', empty: false, required: true },
+        name: { type: 'string', empty: false, required: false },
         data: {
             type: 'object',
             required: false,
