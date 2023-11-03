@@ -242,7 +242,7 @@ module.exports = {
 					}
 				}
 
-				return Promise.all(results);
+				return Promise.allSettled(results);
 			}
 		},
 
