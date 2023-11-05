@@ -63,12 +63,6 @@ module.exports = {
             name: {
                 type: "string",
                 required: true,
-                unique: true,
-                min: 3,
-                max: 255,
-                trim: true,
-                lowercase: true,
-                index: true,
             },
 
             // the description of the cluster
@@ -83,32 +77,90 @@ module.exports = {
             endpoint: {
                 type: "string",
                 required: true,
-                unique: true,
-                min: 3,
-                max: 255,
-                trim: true,
-                lowercase: true,
-                index: true,
             },
 
-            // cluster feature set
-            features: {
+            // cluster routers
+            routers: {
                 type: "array",
                 required: false,
                 default: [],
                 items: {
-                    type: "string",
-                    enum: [
-                        
-                    ]
+                    type: "object",
+                    props: {
+                        // the name of the router
+                        name: {
+                            type: "string",
+                            required: true,
+                        },
+                        // the description of the router
+                        description: {
+                            type: "string",
+                            required: false,
+                            max: 255,
+                            trim: true,
+                        },
+                        // the router ipv4 address
+                        ipv4: {
+                            type: "string",
+                            required: true,
+                        },
+                        // the router ipv6 address
+                        ipv6: {
+                            type: "string",
+                            required: false,
+                        },
+                        // the zone of the router (e.g. ca, usa etc)
+                        zone: {
+                            type: "string",
+                            required: false,
+                        },
+                    }
                 }
             },
 
+            // cluster storage devices
+            storage: {
+                type: "array",
+                required: false,
+                default: [],
+                items: "string",
+                populate: {
+                    action: "v1.storage.nfs.get",
+                }
+            },
+
+            // cluster monitoring endpoint
+            monitoring: {
+                type: "string",
+                required: false,
+            },
+
+            // cluster logging endpoint
+            logging: {
+                type: "string",
+                required: false,
+            },
+
+            // cluster feature sets
+            features: {
+                type: "array",
+                required: false,
+                default: [],
+                items: "string",
+                enum:[
+                    "k8s",
+                    "router",
+                    "storage",
+                    "monitoring",
+                    "logging",
+                    "registry",
+                    "dns",
+                ]
+            },
             
 
 
             ...DbService.FIELDS,// inject dbservice fields
-            //...Membership.FIELDS,// inject membership fields
         },
 
         // default database populates
@@ -117,13 +169,11 @@ module.exports = {
         // database scopes
         scopes: {
             ...DbService.SCOPE,// inject dbservice scope
-            //...Membership.SCOPE,// inject membership scope
         },
 
         // default database scope
         defaultScopes: [
             ...DbService.DSCOPE,// inject dbservice dscope
-            //...Membership.DSCOPE,// inject membership dscope
         ],
 
         // default init config settings
@@ -136,8 +186,6 @@ module.exports = {
      * service actions
      */
     actions: {
-        //...Membership.ACTIONS,// inject membership actions
-
 
     },
 
