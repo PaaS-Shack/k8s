@@ -371,7 +371,7 @@ module.exports = {
                 });
 
         },
-        async "kube.nodes.deleted"(node) {
+        async "kube.nodes.deleted"(ctx) {
             const node = ctx.params;
             // check if node exists
             await this.deleteNode(ctx, node)
