@@ -6,7 +6,7 @@ const ConfigLoader = require("config-mixin");
 const { Context } = require("moleculer");
 const { MoleculerClientError } = require("moleculer").Errors;
 
-/**
+/** def
  * k8s cluster node service manages the nodes in a cluster.
  */
 
@@ -25,9 +25,7 @@ module.exports = {
      * @property {ConfigLoader} ConfigLoader - Config loader mixin
      */
     mixins: [
-        DbService({
-            permissions: "k8s.nodes"
-        }),
+        DbService({}),
         ConfigLoader(['k8s.**']),
     ],
 
@@ -35,7 +33,10 @@ module.exports = {
      * Service dependencies
      */
     dependencies: [
-        "k8s.cluster"
+        {
+            name: "k8s.clusters",
+            version: 1
+        }
     ],
 
     /**
@@ -50,7 +51,10 @@ module.exports = {
             cluster: {
                 type: "string",
                 required: true,
-                description: "The cluster id that this node belongs to."
+                description: "The cluster id that this node belongs to.",
+                populate: {
+                    action: "v1.k8s.clusters.get"
+                }
             },
             uid: {
                 type: "string",
@@ -61,6 +65,11 @@ module.exports = {
                 type: "string",
                 required: true,
                 description: "The name of the node."
+            },
+            enabled: {
+                type: "boolean",
+                description: "True if the node is enabled.",
+                default: false
             },
             online: {
                 type: "boolean",
@@ -87,26 +96,6 @@ module.exports = {
                 required: false,
                 readonly: true,
             },
-            addresses: {
-                type: "array",
-                description: "The addresses for the node.",
-                default: [],
-                required: false,
-                items: {
-                    type: "object",
-                    properties: {
-                        type: {
-                            type: "string",
-                            description: "The type of address.",
-                            enum: ["InternalIP", "ExternalIP", "Hostname"]
-                        },
-                        address: {
-                            type: "string",
-                            description: "The address."
-                        }
-                    }
-                }
-            },
             status: {
                 type: "object",
                 description: "The status of the node.",
@@ -121,6 +110,64 @@ module.exports = {
                                 fields: ["status"]
                             });
                         }));
+                    }
+                }
+            },
+
+            // network addresses
+            addresses: {
+                type: "array",
+                description: "The network addresses of the node.",
+                default: [],
+                required: false,
+                items: {
+                    type: "object",
+                    props: {
+                        type: {
+                            type: "string",
+                            description: "The type of the address.",
+                            enum: ["ipv4", "ipv6", "wireguard"],
+                        },
+                        address: {
+                            type: "string",
+                            description: "The address."
+                        }
+                    }
+                }
+            },
+
+
+            // cluster cidr addresses
+            cidr: {
+                type: "string",
+                description: "The cluster cidr address of the node.",
+                default: "",
+                required: false,
+            },
+
+            // node storage devices
+            storage: {
+                type: "array",
+                description: "The storage devices or folders of the node.",
+                default: [],
+                required: false,
+                items: {
+                    type: "object",
+                    props: {
+                        name: {
+                            type: "string",
+                            description: "The name of the device."
+                        },
+                        path: {
+                            type: "string",
+                            description: "The path of the device."
+                        },
+                        size: {
+                            type: "number",
+                            description: "The size of the device.",
+                            default: 0,
+                            required: false,
+                        },
                     }
                 }
             },
@@ -144,7 +191,29 @@ module.exports = {
 
         // default init config settings
         config: {
-
+            "k8s.nodes.zones": [
+                "ca",
+                "usa",
+                "europe",
+                "asia",
+                "africa",
+                "oceania",
+                "southamerica",
+            ],
+            "k8s.nodes.roles": [
+                "compute",
+                "database",
+                "emails-inbound",
+                "emails-outbound",
+                "ftp",
+                "git",
+                "dns",
+                "proxy",
+                "storage",
+                "vpn",
+                "frontends"
+            ],
+            "k8s.nodes.label": "k8s.one-host.ca/roles-"
         }
     },
 
@@ -162,6 +231,10 @@ module.exports = {
          * @returns {Object} - The updated node.
          */
         addRole: {
+            rest: {
+                method: "POST",
+                path: "/:id/role",
+            },
             params: {
                 id: {
                     type: "string",
@@ -169,7 +242,8 @@ module.exports = {
                 },
                 role: {
                     type: "string",
-                    description: "The role to add to the node."
+                    description: "The role to add to the node.",
+                    empty: false
                 }
             },
             async handler(ctx) {
@@ -201,6 +275,10 @@ module.exports = {
          * @returns {Object} - The updated node.
          */
         removeRole: {
+            rest: {
+                method: "DELETE",
+                path: "/:id/role/:role",
+            },
             params: {
                 id: {
                     type: "string",
@@ -239,6 +317,10 @@ module.exports = {
          * @returns {Object} - The updated node.
          */
         cordon: {
+            rest: {
+                method: "POST",
+                path: "/:id/cordon",
+            },
             params: {
                 id: {
                     type: "string",
@@ -265,7 +347,7 @@ module.exports = {
                 }
 
                 // get cluster
-                const cluster = await ctx.call("v1.k8s.cluster.get", { id: node.cluster });
+                const cluster = await ctx.call("v1.k8s.clusters.get", { id: node.cluster });
 
                 // patch node
                 await ctx.call("v1.kube.patchNode", {
@@ -295,6 +377,10 @@ module.exports = {
          * @returns {Object} - The updated node.
          */
         uncordon: {
+            rest: {
+                method: "POST",
+                path: "/:id/uncordon",
+            },
             params: {
                 id: {
                     type: "string",
@@ -321,7 +407,7 @@ module.exports = {
                 }
 
                 // get cluster
-                const cluster = await ctx.call("v1.k8s.cluster.get", { id: node.cluster });
+                const cluster = await ctx.call("v1.k8s.clusters.get", { id: node.cluster });
 
                 // patch node
                 await ctx.call("v1.kube.patchNode", {
@@ -340,7 +426,357 @@ module.exports = {
                     cordon: false
                 }, { raw: true });
             }
-        }
+        },
+
+        /**
+         * add storage to node
+         * 
+         * @actions
+         * @param {String} id - The id of the node.
+         * @param {String} name - The name of the storage device.
+         * @param {String} path - The path of the storage device.
+         * @param {Number} size - The size of the storage device.
+         * 
+         * @returns {Object} - The updated node.
+         */
+        addStorage: {
+            rest: {
+                method: "POST",
+                path: "/:id/storage",
+            },
+            params: {
+                id: {
+                    type: "string",
+                    description: "The id of the node."
+                },
+                name: {
+                    type: "string",
+                    description: "The name of the storage device."
+                },
+                path: {
+                    type: "string",
+                    description: "The path of the storage device."
+                },
+                size: {
+                    type: "number",
+                    description: "The size of the storage device."
+                }
+            },
+            async handler(ctx) {
+                // get node
+                const node = await this.getById(ctx, ctx.params.id);
+
+                // check if node exists
+                if (!node) {
+                    throw new MoleculerClientError("Node not found.", 404);
+                }
+
+                const storage = {
+                    name: ctx.params.name,
+                    path: ctx.params.path,
+                    size: ctx.params.size
+                }
+
+                // update node
+                return this.updateEntity(ctx, {
+                    id: node.id,
+                    $addToSet: {
+                        storage
+                    }
+                }, { raw: true });
+            }
+        },
+
+        /**
+         * remove storage from node
+         * 
+         * @actions
+         * @param {String} id - The id of the node.
+         * @param {String} name - The name of the storage device.
+         * 
+         * @returns {Object} - The updated node.
+         */
+        removeStorage: {
+            rest: {
+                method: "DELETE",
+                path: "/:id/storage/:name",
+            },
+            params: {
+                id: {
+                    type: "string",
+                    description: "The id of the node."
+                },
+                name: {
+                    type: "string",
+                    description: "The name of the storage device."
+                }
+            },
+            async handler(ctx) {
+                // get node
+                const node = await this.getById(ctx, ctx.params.id);
+
+                // check if node exists
+                if (!node) {
+                    throw new MoleculerClientError("Node not found.", 404);
+                }
+
+                // update node
+                return this.updateEntity(ctx, {
+                    id: node.id,
+                    storage: node.storage.filter(s => s.name !== ctx.params.name)
+                }, { raw: true });
+            }
+        },
+
+        /**
+         * add address to node
+         * 
+         * @actions
+         * @param {String} id - The id of the node.
+         * @param {String} type - address type
+         * @param {String} address - ip addres to add
+         * 
+         * @returns {Object} - The updated node.
+         */
+        addAddress: {
+            rest: {
+                method: "POST",
+                path: "/:id/address",
+            },
+            params: {
+                id: {
+                    type: "string",
+                    description: "The id of the node."
+                },
+                type: {
+                    type: "string",
+                    description: "The type of the address."
+                },
+                address: {
+                    type: "string",
+                    description: "The address."
+                }
+            },
+            async handler(ctx) {
+                // get node
+                const node = await this.getById(ctx, ctx.params.id);
+
+                // check if node exists
+                if (!node) {
+                    throw new MoleculerClientError("Node not found.", 404);
+                }
+
+                // update node
+                return this.updateEntity(ctx, {
+                    id: node.id,
+                    $addToSet: {
+                        addresses: {
+                            type: ctx.params.type,
+                            address: ctx.params.address
+                        }
+                    }
+                }, { raw: true });
+            }
+        },
+
+        /**
+         * remove address from node
+         * 
+         * @actions
+         * @param {String} id - The id of the node.
+         * @param {String} type - address type
+         * @param {String} address - ip addres to remove
+         * 
+         * @returns {Object} - The updated node.
+         */
+        removeAddress: {
+            rest: {
+                method: "DELETE",
+                path: "/:id/address/:type/:address",
+            },
+            params: {
+                id: {
+                    type: "string",
+                    description: "The id of the node."
+                },
+                type: {
+                    type: "string",
+                    description: "The type of the address."
+                },
+                address: {
+                    type: "string",
+                    description: "The address."
+                }
+            },
+            async handler(ctx) {
+                // get node
+                const node = await this.getById(ctx, ctx.params.id);
+
+                // check if node exists
+                if (!node) {
+                    throw new MoleculerClientError("Node not found.", 404);
+                }
+
+                // update node
+                return this.updateEntity(ctx, {
+                    id: node.id,
+                    addresses: node.addresses.filter(a => a.type !== ctx.params.type && a.address !== ctx.params.address)
+                });
+            }
+        },
+
+        /**
+         * get node labels
+         * 
+         * @actions
+         * @param {String} id - The id of the node.
+         * 
+         * @returns {Object} - The node labels.
+         */
+        getLabels: {
+            rest: {
+                method: "GET",
+                path: "/:id/labels",
+            },
+            params: {
+                id: {
+                    type: "string",
+                    description: "The id of the node."
+                }
+            },
+            async handler(ctx) {
+                const node = await this.getById(ctx, ctx.params.id);
+
+                // check if node exists
+                if (!node) {
+                    throw new MoleculerClientError("Node not found.", 404);
+                }
+
+                const cluster = await ctx.call("v1.k8s.clusters.get", { id: node.cluster });
+
+                const result = await ctx.call("v1.kube.findOne", {
+                    metadata: { name: node.name },
+                    kind: "Node",
+                    cluster: cluster.name,
+                    fields: ["metadata.labels"]
+                });
+
+                return result?.metadata?.labels;
+            }
+        },
+
+        /**
+         * apply labels to node
+         * 
+         * @actions
+         * @param {String} id - The id of the node.
+         * 
+         * @returns {Object} - The node labels.
+         */
+        applyLabels: {
+            rest: {
+                method: "POST",
+                path: "/:id/labels",
+            },
+            params: {
+                id: {
+                    type: "string",
+                    description: "The id of the node."
+                }
+            },
+            async handler(ctx) {
+                const node = await this.getById(ctx, ctx.params.id);
+
+                // check if node exists
+                if (!node) {
+                    throw new MoleculerClientError("Node not found.", 404);
+                }
+                const cluster = await ctx.call("v1.k8s.clusters.get", { id: node.cluster });
+
+                const nodeLabels = await this.actions.getLabels({
+                    id: ctx.params.id
+                });
+
+                // strip node labels
+                for (const key in nodeLabels) {
+                    if (key.startsWith(this.settings.config["k8s.nodes.label"])) {
+                        delete nodeLabels[key];
+                    }
+                }
+
+                const labels = await this.getLabels(node.roles);
+                
+                const result = await ctx.call("v1.kube.patchNode", {
+                    name: node.name,
+                    body: {
+                        metadata: {
+                            labels: {
+                                ...nodeLabels,
+                                ...labels
+                            }
+                        }
+                    },
+                    cluster: cluster.name
+                });
+
+                return result?.metadata?.labels;
+            }
+        },
+
+        /**
+         * enable node
+         * 
+         * @actions
+         * @param {String} id - The id of the node.
+         * 
+         * @returns {Object} - The updated node.
+         */
+        enable: {
+            rest: {
+                method: "POST",
+                path: "/:id/enable",
+            },
+            params: {
+                id: {
+                    type: "string",
+                    description: "The id of the node."
+                }
+            },
+            async handler(ctx) {
+                return this.updateEntity(ctx, {
+                    id: ctx.params.id,
+                    enabled: true
+                }, { raw: true });
+            }
+        },
+
+        /**
+         * disable node
+         * 
+         * @actions
+         * @param {String} id - The id of the node.
+         * 
+         * @returns {Object} - The updated node.
+         */
+        disable: {
+            rest: {
+                method: "POST",
+                path: "/:id/disable",
+            },
+            params: {
+                id: {
+                    type: "string",
+                    description: "The id of the node."
+                }
+            },
+            async handler(ctx) {
+                return this.updateEntity(ctx, {
+                    id: ctx.params.id,
+                    enabled: false
+                }, { raw: true });
+            }
+        },
+
     },
 
     /**
@@ -436,6 +872,30 @@ module.exports = {
         },
 
         /**
+         * get node labels from features
+         * 
+         * @param {Object} features - The features of the node.
+         * 
+         * @returns {Object} - The node labels.
+         */
+        getLabels(features) {
+            const labels = {};
+
+            // loop over roles
+            for (const role of this.settings.config["k8s.nodes.roles"]) {
+                const key = this.settings.config["k8s.nodes.label"] + role;
+                // check if role is in features
+                if (features.includes(role)) {
+                    labels[key] = "true";
+                } else {
+                    labels[key] = "false";
+                }
+            }
+
+            return labels;
+        },
+
+        /**
          * create new node
          * 
          * @param {Context} ctx - The context of the request.s
@@ -451,18 +911,46 @@ module.exports = {
             }
 
             // lookup cluster
-            const cluster = await ctx.call("k8s.cluster.lookup", { name: node.cluster });
+            const cluster = await ctx.call("v1.k8s.clusters.getByName", { name: node.cluster });
 
             // check if cluster exists
             if (!cluster) {
                 throw new MoleculerClientError("Cluster not found.", 404);
             }
 
+            // get node zone from node name
+            let zone = node.metadata.name.split(".")[1];
+
+            // validate node zone
+            if (!zone) {
+                zone = "default";
+            } else if (![
+                "ca",
+                "usa",
+                "europe",
+                "asia",
+                "africa",
+                "oceania",
+                "southamerica",
+            ].includes(zone)) {
+                zone = cluster.zone;
+            }
+
+            const address = node.status.addresses.find(a => a.type === "InternalIP").address;
+
             // create node
             return this.createEntity(ctx, {
                 cluster: cluster.id,
                 uid: node.metadata.uid,
-                name: node.metadata.name
+                name: node.metadata.name,
+                zone: zone,
+                cidr: node.spec.podCIDR,
+                addresses: [
+                    {
+                        type: "wireguard",
+                        address: address
+                    }
+                ],
             });
         },
 
@@ -485,7 +973,6 @@ module.exports = {
             // update node
             return this.updateEntity(ctx, {
                 id: entity.id,
-                addresses: node.status.addresses,
                 online: node.status.conditions.filter(c => c.type === "Ready").every(c => c.status === "True")
             });
         },
@@ -508,24 +995,17 @@ module.exports = {
             const entity = await this.getByUID(node.metadata.uid);
 
             // delete node
-            return this.deleteEntity(ctx, {
+            return this.removeEntity(ctx, {
                 id: entity.id,
             });
         },
     },
 
+
     created() { },
 
     async started() {
-        return this.broker.call('v1.kube.find', {
-            kind: "Node",
-            fields: ["metadata.uid", "metadata.name", "status.addresses", "status.conditions"],
-        })
-            .then(async (nodes) => {
-                await Promise.all(nodes.map(async (node) =>
-                    this.updateNode(this.broker, node)
-                ));
-            });
+
     },
 
     async stopped() { },
