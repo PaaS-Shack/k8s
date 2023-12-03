@@ -92,7 +92,7 @@ module.exports = {
 		config: {
 			"k8s.deployments.prometheus": true,
 			"k8s.deployments.prometheus.url": "https://prom.one-host.ca",
-			"k8s.deployment.affinity": true
+			"k8s.deployments.affinity": true
 		}
 	},
 
