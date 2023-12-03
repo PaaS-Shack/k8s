@@ -265,6 +265,14 @@ module.exports = {
                 }
             };
 
+            if(this.config['k8s.deployments.affinity']) {
+                affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions.push({
+                    key: 'k8s.one-host.ca/role-compute',
+                    operator: 'In',
+                    values: ['true']
+                })
+            }
+
             if (image.affinities) {
                 // loop over image affinities
                 for (const affinity of image.affinities) {
