@@ -70,7 +70,11 @@ module.exports = {
 		defaultScopes: [
 			...DbService.DSCOPE,
 			...Membership.DSCOPE
-		]
+		],
+
+		config:{
+			"k8s.volumes.storageClass": "default",
+		}
 	},
 
 	/**
@@ -648,7 +652,7 @@ module.exports = {
 			if (volume.storageClass) {
 				PersistentVolumeClaim.spec.storageClassName = volume.storageClass;
 			} else {
-				PersistentVolumeClaim.spec.storageClassName = 'default';
+				PersistentVolumeClaim.spec.storageClassName = this.config['k8s.volumes.storageClass'];
 			}
 
 			// check for claim name
