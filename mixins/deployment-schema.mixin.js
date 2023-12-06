@@ -267,7 +267,7 @@ module.exports = {
 
             if (this.config['k8s.deployments.affinity']) {
                 affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions.push({
-                    key: "k8s.one-host.ca/role-compute",
+                    key: "k8s.one-host.ca/roles-compute",
                     operator: "In",
                     values: [
                         "true"
