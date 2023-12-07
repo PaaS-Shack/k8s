@@ -69,12 +69,12 @@ module.exports = {
     ],
     resources: {
         requests: {
-            cpu: "100m",
-            memory: "128Mi"
+            cpu: 100,
+            memory: 128
         },
         limits: {
-            cpu: "100m",
-            memory: "128Mi"
+            cpu: 100,
+            memory: 128
         }
     },
     labels:[
