@@ -23,7 +23,7 @@ module.exports = {
         {
             name: "http",
             port: 80,
-            protocol: "TCP"
+            protocol: "HTTP"
         }
     ],
     env: [
