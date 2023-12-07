@@ -148,9 +148,9 @@ module.exports = {
         /**
          * services created event 
          */
-        "k8s.services.created": {
+        "k8s.services.processed": {
             async handler(ctx) {
-                const service = ctx.params.data;
+                const service = ctx.params;
                 const options = { meta: { userID: service.owner } }
 
                 const deploymant = await ctx.call('v1.k8s.deployments.resolve', {

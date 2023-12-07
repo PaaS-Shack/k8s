@@ -334,10 +334,16 @@ module.exports = {
 			});
 
 			//update service uid
-			return this.updateEntity(ctx, {
+			const updated = await this.updateEntity(ctx, {
 				id: service.id,
 				uid: createdService.metadata.uid
 			});
+
+			this.logger.info(`created service ${service.name} in namespace ${namespace.name} for deployment ${deployment.name}`)
+
+			ctx.emit('k8s.services.processed', updated);
+
+			return updated;
 		},
 		/**
 		 * process service remove event
