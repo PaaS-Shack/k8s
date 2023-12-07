@@ -319,8 +319,6 @@ module.exports = {
                 const query = `avg(container_memory_working_set_bytes{namespace="${namespace.name}"}) by (namespace)`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
                     .then((res) => {
-                        console.log(res)
-
                         return res.result[0]
                     })
                 if (!result) {
@@ -449,8 +447,6 @@ module.exports = {
                 const query = `sum(container_memory_working_set_bytes)`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
                     .then((res) => {
-                        console.log(res)
-
                         return res.result[0]
                     })
                 if (!result) {
@@ -605,7 +601,6 @@ module.exports = {
 
             return await this.prom.instantQuery(query)
                 .then((res) => {
-                    console.log(res)
                     // loop through the results and format them
                     let results = [];
                     for (let i = 0; i < res.result.length; i++) {
