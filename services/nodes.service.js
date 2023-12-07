@@ -800,7 +800,7 @@ module.exports = {
             // check if node exists
             await this.updateNode(ctx, node)
                 .then(node => {
-                    this.logger.info(`Node ${node.name} modified.`);
+                   // this.logger.info(`Node ${node.name} modified.`);
                 })
                 .catch(err => {
                     this.logger.error(err);
