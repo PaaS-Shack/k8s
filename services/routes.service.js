@@ -272,8 +272,7 @@ module.exports = {
                     deployment: deployment.id,
                     namespace: deployment.namespace
                 }
-            })
-
+            });
 
             for (let index = 0; index < routes.length; index++) {
                 const { id, route } = routes[index];
@@ -434,10 +433,8 @@ module.exports = {
 
             // get routes
             for (const routeID of deployment.routes) {
-
                 const route = await ctx.call('v1.routes.resolve', { id: routeID }, options);
                 routes.push(route);
-
             }
 
             return routes;
