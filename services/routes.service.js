@@ -96,6 +96,15 @@ module.exports = {
                 }
             },
 
+            // certificate
+            certificate: {
+                type: "string",
+                required: false,
+                populate: {
+                    action: "v1.certificates.resolve"
+                },
+            },
+
             ...DbService.FIELDS,// inject dbservice fields
             ...Membership.FIELDS,// inject membership fields
         },
@@ -339,6 +348,7 @@ module.exports = {
         async processRouteCreate(ctx, route) {
 
             const router = this.config['k8s.routes.router'];
+            const options = { meta: { userID: route.owner } };
 
             // create dns record
             const record = await ctx.call('v1.domains.records.create', {
@@ -346,7 +356,7 @@ module.exports = {
                 type: 'A',
                 data: router,
                 ttl: 300
-            }, { meta: { userID: route.owner } });
+            }, options);
 
             // update route record
             await this.updateEntity(ctx, {
@@ -354,7 +364,24 @@ module.exports = {
                 record: record.id
             });
 
-            this.logger.info(`Add new dns route ${route.id} id ${route.id} on deployment ${route.deployment}`)
+            this.logger.info(`Add new dns route ${route.id} id ${route.id} on deployment ${route.deployment}`);
+
+            // check for certificate
+            await ctx.call('v1.certificates.resolveDomain', {
+                domain: route.vHost
+            }, options)
+                .catch((err) =>
+                    ctx.call('v1.certificates.letsencrypt.dns', {
+                        domain: route.vHost
+                    }, options)
+                )
+                .then((certificate) => {
+                    this.logger.info(`Add new certificate ${certificate.id} on route ${route.id}`);
+                    return this.updateEntity(ctx, {
+                        id: route.id,
+                        certificate: certificate.id
+                    });
+                });
         },
 
         /**
