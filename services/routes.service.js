@@ -73,6 +73,17 @@ module.exports = {
                     }
                 },
             },
+
+            // service
+            service: {
+                type: "string",
+                required: true,
+                populate: {
+                    action: "v1.k8s.services.resolve"
+                },
+            },
+
+            // dns record
             record: {
                 type: "string",
                 required: false,
@@ -83,6 +94,17 @@ module.exports = {
                     }
                 },
             },
+
+            // certificate
+            certificate: {
+                type: "string",
+                required: false,
+                populate: {
+                    action: "v1.certificates.resolve"
+                },
+            },
+
+            // hosts
             hosts: {
                 type: 'array',
                 items: "string",
@@ -94,15 +116,6 @@ module.exports = {
                         fields: ["id", "hostname", "port"]
                     }
                 }
-            },
-
-            // certificate
-            certificate: {
-                type: "string",
-                required: false,
-                populate: {
-                    action: "v1.certificates.resolve"
-                },
             },
 
             ...DbService.FIELDS,// inject dbservice fields
@@ -233,7 +246,7 @@ module.exports = {
                         vertualHost = `${vHost}`;
                     }
 
-                    await this.createOrUpdateRoute(ctx, deployment, vertualHost, options)
+                    await this.createOrUpdateRoute(ctx, deployment, vertualHost, service, options)
                         .then((route) => this.createOrUpdateHost(ctx, namespace, route, {
                             hostname: hostname,
                             port: port.port
@@ -280,10 +293,13 @@ module.exports = {
          * @param {Object} ctx - context object
          * @param {Object} deployment - deployment object
          * @param {String} vHost - vHost
+         * @param {Object} service - service object
+         * @param {Object} options - options object
+         * 
          * 
          * @requires {Promise} - returns created or updated route
          */
-        async createOrUpdateRoute(ctx, deployment, vHost, options) {
+        async createOrUpdateRoute(ctx, deployment, vHost, service, options) {
 
             //resolve route
             const found = await ctx.call('v1.routes.resolveRoute', {
@@ -295,7 +311,8 @@ module.exports = {
                     vHost,
                     route: found.id,
                     deployment: deployment.id,
-                    namespace: deployment.namespace
+                    namespace: deployment.namespace,
+                    service: service.id
                 }, options);
                 this.logger.info(`Found route ${found.id} id ${entity.id} on deployment ${deployment.id}`)
                 return entity;
@@ -307,7 +324,8 @@ module.exports = {
                     vHost,
                     route: route.id,
                     deployment: deployment.id,
-                    namespace: deployment.namespace
+                    namespace: deployment.namespace,
+                    service: service.id
                 }, options)
                 this.logger.info(`Add new route ${route.id} id ${entity.id} on deployment ${deployment.id}`)
                 return entity;
