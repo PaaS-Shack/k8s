@@ -110,7 +110,7 @@ module.exports = {
 
         // default init config settings
         config: {
-
+            "k8s.routes.router": "1.1.1.1"
         }
     },
 
@@ -338,6 +338,23 @@ module.exports = {
          */
         async processRouteCreate(ctx, route) {
 
+            const router = this.config['k8s.routes.router'];
+
+            // create dns record
+            const record = await ctx.call('v1.domains.records.create', {
+                fqdn: route.vHost,
+                type: 'A',
+                data: router,
+                ttl: 300
+            }, { meta: { userID: route.owner } });
+
+            // update route record
+            await this.updateEntity(ctx, {
+                id: route.id,
+                record: record.id
+            });
+
+            this.logger.info(`Add new dns route ${route.id} id ${route.id} on deployment ${route.deployment}`)
         },
 
         /**
@@ -350,6 +367,12 @@ module.exports = {
          */
         async processRouteRemove(ctx, route) {
 
+            // remove dns record
+            await ctx.call('v1.domains.records.remove', {
+                id: route.record
+            }, { meta: { userID: route.owner } });
+
+            this.logger.info(`Remove dns route ${route.id} id ${route.id} on deployment ${route.deployment}`);
         },
 
         /**
