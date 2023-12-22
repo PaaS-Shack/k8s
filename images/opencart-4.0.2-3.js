@@ -34,27 +34,27 @@ module.exports = {
             value: "mysql"
         },
         {
-            key: "DB_HOST",
+            key: "OPENCART_DATABASE_HOST",
             type: "map",
             value: "MYSQL_HOST"
         },
         {
-            key: "DB_PORT",
+            key: "OPENCART_DATABASE_PORT_NUMBER",
             type: "map",
             value: "MYSQL_PORT"
         },
         {
-            key: "DB_NAME",
+            key: "OPENCART_DATABASE_NAME",
             type: "map",
             value: "MYSQL_DATABASE"
         },
         {
-            key: "DB_USER",
+            key: "OPENCART_DATABASE_USER",
             type: "map",
             value: "MYSQL_USERNAME"
         },
         {
-            key: "DB_PASSWD",
+            key: "OPENCART_DATABASE_PASSWORD",
             type: "map",
             value: "MYSQL_PASSWORD"
         }
