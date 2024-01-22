@@ -479,21 +479,15 @@ module.exports = {
 				for (let index = 0; index < maps.length; index++) {
 					const map = maps[index];
 
-					const split = map.value.split(',');
+					// loop envs and replace map value with env value
+					let value = map.value;
 
-					if (split.length > 1) {
-						mapScope[map.key] = split.map((key) => envs[key]).join(':');
-					} else {
-						// loop envs and replace map value with env value
-						let value = map.value;
-
-						for (const key in envs) {
-								const element = envs[key];
-								value = value.replace(`\${${key}}`, element);
-						}
-						
-						mapScope[map.key] = value;
+					for (const key in envs) {
+						const element = envs[key];
+						value = value.replace(`\${${key}}`, element);
 					}
+
+					mapScope[map.key] = value;
 				}
 
 				return Object.assign({}, envs, mapScope);
