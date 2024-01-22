@@ -483,8 +483,12 @@ module.exports = {
 					let value = map.value;
 
 					for (const key in envs) {
-						const element = envs[key];
-						value = value.replace(`\${${key}}`, element);
+						if (Object.hasOwnProperty.call(envs, key)) {
+							const element = envs[key];
+
+							value = value.replace(`${key}`, element);
+							console.log(value, key, element)
+						}
 					}
 
 					mapScope[map.key] = value;
