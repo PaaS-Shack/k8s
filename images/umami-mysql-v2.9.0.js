@@ -42,12 +42,12 @@ module.exports = {
     ],
     resources: {
         requests: {
-            cpu: "100m",
-            memory: "128Mi"
+            cpu: 100,
+            memory:128
         },
         limits: {
-            cpu: "1000m",
-            memory: "1024Mi"
+            cpu: 1000,
+            memory: 256
         }
     },
     labels: [
