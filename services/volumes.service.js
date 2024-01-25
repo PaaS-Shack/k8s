@@ -72,7 +72,7 @@ module.exports = {
 			...Membership.DSCOPE
 		],
 
-		config:{
+		config: {
 			"k8s.volumes.storageClass": "default",
 		}
 	},
@@ -657,7 +657,17 @@ module.exports = {
 
 			// check for claim name
 			if (volume.persistentVolumeClaim && volume.persistentVolumeClaim.claimName) {
-				PersistentVolumeClaim.spec.volumeName = volume.persistentVolumeClaim.claimName;
+				// lookup volume by clam name
+				const found = await this.findEntity(null, {
+					query: {
+						namespace: namespace.id,
+						name: volume.persistentVolumeClaim.claimName,
+					}
+				});
+
+				if (found) {
+					annotations["k8s.one-host.ca/shared-volume-id"] = found.id;
+				}
 			}
 
 			return ctx.call('v1.kube.createNamespacedPersistentVolumeClaim', {
