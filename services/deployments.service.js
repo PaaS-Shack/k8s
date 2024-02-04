@@ -596,6 +596,9 @@ module.exports = {
 
 				// remove the deployment
 				await this.removeDeployment(ctx, namespace, deployment, image);
+
+				// remove tails logs
+				await ctx.call("v1.tails.remove", { id: deployment.tails });
 			}
 		},
 	},

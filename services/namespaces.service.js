@@ -236,12 +236,15 @@ module.exports = {
 		},
 		async "k8s.namespaces.removed"(ctx) {
 			const namespace = ctx.params.data;
-			return this.deleteNamespace(ctx, namespace)
+			await this.deleteNamespace(ctx, namespace)
 				.then((resource) => {
 					this.logger.info(`Deleting namespace ${namespace.name} on cluster ${namespace.cluster} with uid ${resource.metadata.uid}`);
 				}).catch((err) => {
 					this.logger.error(`Deleting namespace ${namespace.name} on cluster ${namespace.cluster} failed with error ${err.message}`);
 				});
+
+			// remove tails stream
+			await ctx.call("v1.tails.remove", { id: namespace.tails });
 
 		},
 		async "kube.namespaces.added"(ctx) {
