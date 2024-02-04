@@ -701,7 +701,7 @@ module.exports = {
 				idel: false,
 				log: {
 					query: `{app="${deployment.name}",namespace="${namespace.name}"}`,
-					start: 'now-1h',
+					start: deployment.createdAt,
 				},
 			});
 

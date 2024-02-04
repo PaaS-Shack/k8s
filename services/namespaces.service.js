@@ -363,7 +363,7 @@ module.exports = {
 				idel: false,
 				log: {
 					query: `{namespace="${namespace.name}"}`,
-					start: 'now-1h',
+					start: namespace.createdAt,
 				},
 			});
 
