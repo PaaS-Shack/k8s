@@ -485,9 +485,7 @@ module.exports = {
 					for (const key in envs) {
 						if (Object.hasOwnProperty.call(envs, key)) {
 							const element = envs[key];
-
 							value = value.replace(`${key}`, element);
-							console.log(value, key, element)
 						}
 					}
 
