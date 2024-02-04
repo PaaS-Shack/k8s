@@ -378,11 +378,13 @@ module.exports = {
 		},
 
 		/**
-		 * Scale a deployment up or down
+		 * Scale a deployment up or down by changing the number of replicas
+		 * Resource limits and requests can also be updated
 		 * 
 		 * @actions
 		 * @param {String} id - deployment id
 		 * @param {Number} replicas - number of replicas
+		 * @param {Object} resources - resources object
 		 * 
 		 * @returns {Promise} deployment pods
 		 */
@@ -394,17 +396,50 @@ module.exports = {
 			permissions: ['k8s.deployments.scale'],
 			params: {
 				id: { type: "string", optional: false },
-				replicas: { type: "number", min: 0, max: 100, optional: false },
+				replicas: { type: "number", min: 0, max: 100, optional: true },
+				resources: {
+					type: "object",
+					optional: true,
+					properties: {
+						limits: {
+							type: "object",
+							optional: true,
+							properties: {
+								cpu: { type: "number", optional: true },
+								memory: { type: "number", optional: true }
+							}
+						},
+						requests: {
+							type: "object",
+							optional: true,
+							properties: {
+								cpu: { type: "number", optional: true },
+								memory: { type: "number", optional: true }
+							}
+						}
+					}
+				}
 			},
 			async handler(ctx) {
 				const params = Object.assign({}, ctx.params);
 
 				const deployment = await this.resolveEntities(ctx, { id: params.id });
 
-				return this.updateEntity(ctx, {
+				// check if the deployment exists
+				if (!deployment) {
+					throw new MoleculerClientError("Deployment not found", 404, "", [{ field: "id", message: "not found" }]);
+				}
+
+				const update = {
 					id: deployment.id,
 					replicas: params.replicas
-				});
+				};
+
+				if (params.resources) {
+					update.resources = params.resources;
+				}
+
+				return this.updateEntity(ctx, update);
 			}
 		},
 
