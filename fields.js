@@ -1190,7 +1190,16 @@ const NAMESPACE_FIELDS = {
             populate: {
                 action: 'v1.domains.resolve',
             }
-        }
+        },
+
+        // tails log stream id
+        tails: {
+            type: 'string',
+            required: false,
+            populate: {
+                action: 'v1.tails.resolve',
+            }
+        },
     }
 };
 

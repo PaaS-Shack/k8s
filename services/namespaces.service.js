@@ -222,13 +222,16 @@ module.exports = {
 	events: {
 		async "k8s.namespaces.created"(ctx) {
 			const namespace = ctx.params.data;
-			return this.createNamespace(ctx, namespace)
+			await this.createNamespace(ctx, namespace)
 				.then((resource) => {
 					this.logger.info(`Creating namespace ${namespace.name} on cluster ${namespace.cluster} with uid ${resource.metadata.uid}`);
 				})
 				.catch((err) => {
 					this.logger.error(`Creating namespace ${namespace.name} on cluster ${namespace.cluster} failed with error ${err.message}`);
 				});
+
+			// create tails stream
+			await this.createTailsStream(ctx, namespace);
 
 		},
 		async "k8s.namespaces.removed"(ctx) {
@@ -337,6 +340,35 @@ module.exports = {
 
 			// create namespace
 			return ctx.call('v1.kube.createNamespace', { body: Namespace, cluster: namespace.cluster });
+		},
+
+		/**
+		 * Create tails stream
+		 * 
+		 * @param {Object} ctx
+		 * @param {Object} namespace
+		 * 
+		 * @returns {Promise}
+		 */
+		async createTailsStream(ctx, namespace) {
+			// create tails logs for deployment
+			const tails = await ctx.call("v1.tails.create", {
+				type: 'log',
+				status: 'active',
+				title: `${namespace.name} logs`,
+				user: namespace.owner,
+				idel: false,
+				log: {
+					query: `{namespace=${namespace.name}}`,
+					start: 'now-1h',
+				},
+			});
+
+			// update deployment with tails logs
+			return this.updateEntity(ctx, {
+				id: namespace.id,
+				tails: tails.id
+			});
 		},
 
 		/**

@@ -689,11 +689,8 @@ module.exports = {
 		 */
 		async createTailsLogs(ctx, namespace, deployment, image) {
 
-			// deploymant lables
-			const labales = await this.generateDeploymentLabels(ctx, namespace, deployment, image);
-
 			// create tails logs for deployment
-			const tails = await ctx.call("v1.k8s.logs.create", {
+			const tails = await ctx.call("v1.tails.create", {
 				type: 'log',
 				status: 'active',
 				title: `${deployment.name} logs`,
