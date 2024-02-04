@@ -700,7 +700,7 @@ module.exports = {
 				user: deployment.owner,
 				idel: false,
 				log: {
-					query: `{app=${deployment.name},namespace=${namespace.name}}`,
+					query: `{app="${deployment.name}",namespace="${namespace.name}"}`,
 					start: 'now-1h',
 				},
 			});

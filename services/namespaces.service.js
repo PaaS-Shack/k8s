@@ -362,7 +362,7 @@ module.exports = {
 				user: namespace.owner,
 				idel: false,
 				log: {
-					query: `{namespace=${namespace.name}}`,
+					query: `{namespace="${namespace.name}"}`,
 					start: 'now-1h',
 				},
 			});
