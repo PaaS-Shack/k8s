@@ -385,7 +385,7 @@ module.exports = {
 		async deleteNamespace(ctx, namespace) {
 			const name = namespace.name;
 
-			// sleep for 10 secons
+			// sleep for 10 seconds? to allow for resources to be deleted
 			await new Promise((resolve) => setTimeout(resolve, 10000));
 
 			// delete namespace
