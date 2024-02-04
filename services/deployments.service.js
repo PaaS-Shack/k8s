@@ -455,6 +455,32 @@ module.exports = {
 		},
 
 		/**
+		 * stop a deployment by scaling it to 0
+		 * 
+		 * @actions
+		 * @param {String} id - deployment id
+		 * 
+		 * @returns {Promise} deployment pods
+		 */
+		stop: {
+			rest: {
+				method: "POST",
+				path: "/:id/stop"
+			},
+			params: {
+				id: { type: "string", optional: false },
+			},
+			async handler(ctx) {
+				const params = Object.assign({}, ctx.params);
+
+				return this.actions.scale({
+					id: params.id,
+					replicas: 0
+				});
+			}
+		},
+
+		/**
 		 * get pod top metrics
 		 * 
 		 * @actions
@@ -544,6 +570,8 @@ module.exports = {
 
 				// after deployment is created create setup all the k8s resources
 				await this.createDeployment(ctx, namespace, deployment, image);
+
+				await this.createTailsLogs(ctx, namespace, deployment, image);
 			}
 		},
 		"k8s.deployments.updated": {
@@ -648,6 +676,39 @@ module.exports = {
 			return this.updateEntity(ctx, {
 				id: deployment.id,
 				uid: result.metadata.uid
+			});
+		},
+
+		/**
+		 * create tails logs for a deployment
+		 * 
+		 * @param {Object} ctx - context
+		 * @param {Object} namespace - namespace Object
+		 * @param {Object} deployment - deployment object
+		 * @param {Object} image - image object
+		 */
+		async createTailsLogs(ctx, namespace, deployment, image) {
+
+			// deploymant lables
+			const labales = await this.generateDeploymentLabels(ctx, namespace, deployment, image);
+
+			// create tails logs for deployment
+			const tails = await ctx.call("v1.k8s.logs.create", {
+				type: 'log',
+				status: 'active',
+				title: `${deployment.name} logs`,
+				user: deployment.owner,
+				idel: false,
+				log: {
+					query: `{app=${deployment.name},namespace=${namespace.name}}`,
+					start: 'now-1h',
+				},
+			});
+
+			// update deployment with tails logs
+			return this.updateEntity(ctx, {
+				id: deployment.id,
+				tails: tails.id
 			});
 		},
 

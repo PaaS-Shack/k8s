@@ -953,6 +953,15 @@ const DEPLOYMENT_FIELDS = {
             }
         },
 
+        // tails log stream id
+        tails: {
+            type: 'string',
+            required: false,
+            populate: {
+                action: 'v1.tails.resolve',
+            }
+        },
+
         // deployment replicas (1)
         replicas: { type: 'number', default: 1, min: 0, max: 10, required: false },
         // deployment ports. can be used to open abatrairy ports outside of image ports
