@@ -500,11 +500,11 @@ module.exports = {
 			}
 
 			if (deployment.image.configMap) {
-				configMapData = Object.assign(configMapData, deployment.image.configMap.data);
+				configMapData = Object.assign({}, deployment.image.configMap.data);
 			}
 
 			if (deployment.configMap) {
-				configMapData = Object.assign(configMapData, deployment.configMap.data);
+				configMapData = Object.assign({}, configMapData, deployment.configMap.data);
 			}
 
 			const configMap = {
@@ -663,7 +663,7 @@ module.exports = {
 						namespace: namespace.id,
 						name: volume.persistentVolumeClaim.claimName,
 					},
-					scope:'-membership'
+					scope: '-membership'
 				});
 
 				if (found) {
