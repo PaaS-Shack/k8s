@@ -472,7 +472,7 @@ module.exports = {
                 let claimName = `${namespace.name}-${deployment.name}-${volume.name}-claim`;
 
                 if (volume.persistentVolumeClaim) {
-                    claimName = volume.persistentVolumeClaim.claimName;
+                    //claimName = volume.persistentVolumeClaim.claimName;
                 }
 
                 spec.persistentVolumeClaim = {
