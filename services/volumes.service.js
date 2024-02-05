@@ -670,10 +670,6 @@ module.exports = {
 						id: found.deployment,
 						fields: ['id', 'name']
 					});
-					const namespace = await ctx.call('v1.k8s.namespaces.resolve', {
-						id: found.namespace,
-						fields: ['id', 'name']
-					});
 					const vol = await ctx.call('v1.storage.volumes.find', {
 						query: {
 							name: `vol-${namespace.name}-${deployment ? deployment.name : 'shared'}-${found.name}-claim`
