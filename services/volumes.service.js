@@ -662,10 +662,11 @@ module.exports = {
 					query: {
 						namespace: namespace.id,
 						name: volume.persistentVolumeClaim.claimName,
-					}
+					},
+					scope:'-membership'
 				});
 
-				this.logger.info(`found volume ${found.name} with claim name ${volume.persistentVolumeClaim.claimName} creating pvc with volume name ${volumeName}`);
+				this.logger.info(`found volume ${found.name} with claim name ${volume.persistentVolumeClaim.claimName}`);
 
 				if (found) {
 					const deployment = found.deployment && await ctx.call('v1.k8s.deployments.resolve', {
