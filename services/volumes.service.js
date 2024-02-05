@@ -350,7 +350,7 @@ module.exports = {
 				return ctx.call('v1.kube.readNamespacedPersistentVolumeClaim', {
 					namespace: namespace.name,
 					cluster: namespace.cluster,
-					name: `${volume.name}-claim`
+					name: `${namespace.name}-${deployment ? deployment.name : 'shared'}-${volume.name}-claim`
 				}).then((res) => {
 					return res.status;
 				});
@@ -665,7 +665,7 @@ module.exports = {
 					},
 					scope:'-membership'
 				});
-				
+
 				if (found) {
 					const deployment = found.deployment && await ctx.call('v1.k8s.deployments.resolve', {
 						id: found.deployment,
