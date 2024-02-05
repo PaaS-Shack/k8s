@@ -676,7 +676,7 @@ module.exports = {
 					});
 					const vol = await ctx.call('v1.storage.volumes.find', {
 						query: {
-							name: `vol-${namespace.name}-${deployment ? deployment.name : 'shared'}-${volume.name}-claim`
+							name: `vol-${namespace.name}-${deployment ? deployment.name : 'shared'}-${found.name}-claim`
 						}
 					}).then((res) => {
 						return res[0];
