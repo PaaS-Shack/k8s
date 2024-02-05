@@ -665,9 +665,7 @@ module.exports = {
 					},
 					scope:'-membership'
 				});
-
-				this.logger.info(`found volume ${found.name} with claim name ${volume.persistentVolumeClaim.claimName}`);
-
+				
 				if (found) {
 					const deployment = found.deployment && await ctx.call('v1.k8s.deployments.resolve', {
 						id: found.deployment,
