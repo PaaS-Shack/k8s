@@ -621,7 +621,7 @@ module.exports = {
 				"k8s.one-host.ca/namespace": namespace.id,
 				"k8s.one-host.ca/deployment": deployment ? deployment.id : null,
 				"k8s.one-host.ca/volume": volume.id,
-				"k8s.one-host.ca/storage-zone": deployment.zone,
+				"k8s.one-host.ca/storage-zone": deployment?.zone,
 				"k8s.one-host.ca/storage-prefix": namespace.name,
 			};
 
