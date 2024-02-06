@@ -210,6 +210,7 @@ const ENVS_FIELDS = {
             required: true
         },
         caller: { type: "string", required: false, },
+        called: { type: "boolean", default: false, required: false },
         index: { type: "number", default: 0, required: false, },
         scope: {
             type: 'enum',
@@ -238,6 +239,7 @@ const ENV_FIELDS = {
             required: true
         },
         caller: { type: "string", required: false, },
+        called: { type: "boolean", default: false, required: false },
         index: { type: "number", default: 0, required: false, },
         scope: {
             type: 'enum',
@@ -422,7 +424,7 @@ const TOLERATIONS_FIELDS = {
             effect: {
                 type: 'enum',
                 values: ['NoSchedule', 'PreferNoSchedule', 'NoExecute'],
-                default: 'NoSchedule', 
+                default: 'NoSchedule',
                 required: true
             },
         }
