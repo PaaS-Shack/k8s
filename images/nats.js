@@ -18,7 +18,7 @@ module.exports = {
     imagePullSecrets: [],
     args: [
         "-c",
-        "/nats-server.conf"
+        "/natsconfig/nats-server.conf"
     ],
     ports: [
         {
@@ -36,7 +36,7 @@ module.exports = {
         {
             name: "nats-config",
             type: "configMap",
-            mountPath: "/nats-config/",
+            mountPath: "/natsconfig/",
             configMap: {
                 name: "nats-config",
                 items: [
