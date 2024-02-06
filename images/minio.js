@@ -9,7 +9,7 @@ const FIELDS = require("../fields");
 
 module.exports = {
     name: "minio",
-    namespace: "library",
+    namespace: "minio",
     tag: "latest",
     digest: "sha256:3d5f8a7e7d0e1d0a9b7b2d6a8d9a0a6a1b2b3b4b5b6b7b8b9b0c1c2c3c4c5c6c7",
     image: "minio/minio:latest",
