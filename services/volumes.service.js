@@ -667,18 +667,8 @@ module.exports = {
 				});
 
 				if (found) {
-					const deployment = found.deployment && await ctx.call('v1.k8s.deployments.resolve', {
-						id: found.deployment,
-						fields: ['id', 'name']
-					});
-					const volName = `vol-${namespace.name}-${deployment ? deployment.name : 'shared'}-${found.name}-claim`
-					this.logger.info(`found volume ${found.name} with claim name ${found.name} creating pvc with volume name ${volName}`);
-					const vol = await ctx.call('v1.storage.volumes.find', {
-						query: {
-							name: volName
-						}
-					}).then((res) => {
-						return res[0];
+					const vol = await ctx.call('v1.storage.volumes.resolveK8s', {
+						id: found.id
 					});
 					if (vol) {
 						annotations["k8s.one-host.ca/shared-volume-id"] = vol.id;
