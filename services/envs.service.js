@@ -745,7 +745,6 @@ module.exports = {
 				})
 			}
 
-			console.log(configMap)
 
 			if (create) {
 				// create config map
