@@ -268,7 +268,7 @@ module.exports = {
 					};
 
 					const createdVolume = await ctx.call('v1.k8s.volumes.create', config, options)
-					this.logger.info(`volume ${volume.name} created from deployment ${deployment.name}`, createdVolume);
+					this.logger.info(`volume ${volume.name} created from deployment ${deployment.name}`);
 				}
 
 				// loop image volumes
@@ -284,7 +284,7 @@ module.exports = {
 					};
 
 					const createdVolume = await ctx.call('v1.k8s.volumes.create', config, options)
-					this.logger.info(`volume ${volume.name} created from image ${image.name}`, createdVolume);
+					this.logger.info(`volume ${volume.name} created from image ${image.name}`);
 				}
 			}
 		},
