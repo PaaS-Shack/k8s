@@ -515,6 +515,9 @@ module.exports = {
 					cluster: namespace.cluster,
 					name: volume.name,
 					body: configMap
+				}).catch((err) => {
+					console.log(configMapData)
+					this.logger.error(`configMap ${volume.name} replace failed`);
 				});
 			});
 
