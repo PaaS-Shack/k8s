@@ -583,7 +583,7 @@ module.exports = {
 			await this.patchConfigMap(ctx, env);
 
 			// if type is provision call deprovision
-			if (env.type == 'provision') {
+			if (env.type == 'provision' && !env.called) {
 				const callCMD = `v1.${env.key}.deprovision`
 
 				this.logger.info(`Deprovision ENV ${env.key} for ${env.deployment} at ${callCMD}`)
