@@ -421,7 +421,7 @@ module.exports = {
 				const params = Object.assign({}, ctx.params);
 				const entity = {};
 
-				this.logger.info(`Packing ENV ${params.scope} for ${params.deployment}`)
+				//this.logger.info(`Packing ENV ${params.scope} for ${params.deployment}`)
 
 				// find all envs for deployment
 				let found = await this.findEntities(null, {
@@ -457,7 +457,7 @@ module.exports = {
 					const element = provisions[index];
 
 					const callCMD = `v1.${element.key}.pack`;
-					this.logger.info(`Packing provisioned ENV ${element.key} for ${params.deployment} at ${callCMD}`)
+					//this.logger.info(`Packing provisioned ENV ${element.key} for ${params.deployment} at ${callCMD}`)
 
 					// call pack on provisioned env
 					const entity = await ctx.call(callCMD, {
