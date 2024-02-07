@@ -737,8 +737,6 @@ module.exports = {
 				deployment: env.deployment
 			});
 
-			console.log(packed)
-
 			// k8s ConfigMap object
 			const configMap = {
 				"apiVersion": "v1",
