@@ -492,7 +492,7 @@ module.exports = {
 					mapScope[map.key] = value;
 				}
 
-				const result= Object.assign({}, envs, mapScope);
+				const result = Object.assign({}, envs, mapScope);
 
 				// convert all envs to string
 				for (const key in result) {
@@ -501,7 +501,7 @@ module.exports = {
 						result[key] = `${element}`;
 					}
 				}
-				
+
 				return result;
 			}
 		},
@@ -732,6 +732,13 @@ module.exports = {
 				fields: ['name']
 			});
 
+			const packed = await ctx.call('v1.k8s.envs.pack', {
+				namespace: env.namespace,
+				deployment: env.deployment
+			});
+
+			console.log(packed)
+
 			// k8s ConfigMap object
 			const configMap = {
 				"apiVersion": "v1",
@@ -739,10 +746,7 @@ module.exports = {
 				"metadata": {
 					"name": `${deployment.name}`
 				},
-				"data": await ctx.call('v1.k8s.envs.pack', {
-					namespace: env.namespace,
-					deployment: env.deployment
-				})
+				"data": packed
 			}
 
 
