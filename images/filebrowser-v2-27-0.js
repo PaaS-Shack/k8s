@@ -3,7 +3,7 @@
  * 
  * docker.io/filebrowser/filebrowser:latest
  */
-export const filebrowser = {
+module.exports = {
     name: "filebrowser-v2-27-0",
     namespace: "filebrowser",
     tag: "v2.27.0",
