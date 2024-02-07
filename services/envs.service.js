@@ -735,6 +735,8 @@ module.exports = {
 				})
 			}
 
+			console.log(configMap)
+
 			if (create) {
 				// create config map
 				return ctx.call('v1.kube.createNamespacedConfigMap', {
