@@ -61,5 +61,15 @@ authorization {
 }
 `
         }
-    }
+    },
+    resources: {
+        limits: {
+            cpu: 100,// 500m
+            memory: 100,// 500Mi
+        },
+        requests: {
+            cpu: 10,// 100m
+            memory: 20,// 20Mi
+        }
+    },
 };
