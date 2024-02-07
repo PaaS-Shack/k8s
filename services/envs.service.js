@@ -492,7 +492,17 @@ module.exports = {
 					mapScope[map.key] = value;
 				}
 
-				return Object.assign({}, envs, mapScope);
+				const result= Object.assign({}, envs, mapScope);
+
+				// convert all envs to string
+				for (const key in result) {
+					if (Object.hasOwnProperty.call(result, key)) {
+						const element = result[key];
+						result[key] = `${element}`;
+					}
+				}
+				
+				return result;
 			}
 		},
 
