@@ -181,27 +181,10 @@ module.exports = {
 					populate: 'image'
 				}, options);
 
-				if (volume.type == 'persistentVolumeClaim') {
-					// create pvc
-					const createdPVC = await this.createPVC(ctx, namespace, volume, deployment);
-				} else if (volume.type == 'persistentVolume') {
-					// create pv
-					const createdPV = await this.createPV(ctx, namespace, volume, deployment);
-				} else if (volume.type == 'emptyDir') {
-					// create emptyDir
-					const createdVolume = await this.createEmptyDir(ctx, namespace, volume, deployment);
-				} else if (volume.type == 'hostPath') {
-					// create hostPath
-					const createdVolume = await this.createHostPath(ctx, namespace, volume, deployment);
-				} else if (volume.type == 'configMap') {
-					// create configMap
-					const createdVolume = await this.createConfigMap(ctx, namespace, volume, deployment);
-				} else if (volume.type == 'secret') {
-					// create secret
-					const createdVolume = await this.createSecret(ctx, namespace, volume, deployment);
-				}
+				//return volume;
+				await this.createVolume(ctx, volume, namespace, deployment);
 
-				this.logger.info(`volume ${volume.name} created`)
+				this.logger.info(`volume ${volume.name} created`);
 
 			}
 		},
