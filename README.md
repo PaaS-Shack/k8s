@@ -2,6 +2,133 @@
 
 K8S are a set of services that provide a Kubernetes API like interface for managing Kubernetes resources. The services are implemented as a set of modules that can be used together or independently. The modules are designed to be used with the [Kubernetes API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/) and [Kubernetes API Reference](https://kubernetes.io/docs/reference/).
 
+
+## How to use
+
+
+```js
+
+// Get namespace
+const namespace = await ctx.call("v1.k8s.namespaces.resolveName", {
+    name: "default"
+});
+
+// deployment membership
+const options = {
+    meta: {
+        userID: namespace.owner
+    }
+};
+
+const name = "my-app";
+```
+
+### Images
+An iamge might look like this:
+
+```js
+module.exports = {
+    // name of the image
+    name: "php-8-1-0-fpm",
+    // namespace of the image
+    namespace: "library",
+    // tag of the image
+    tag: "8.1.0-fpm",
+    // digest of the image
+    digest: 'sha256:001281a0eb6140b0e5096664d785abd6e6d2921316d002c1d912867725076299',
+    // image name with tag
+    image: "php:8.1.0-fpm",
+    // registry of the image
+    registry: "docker.io",
+    // repository of the image
+    repository: "library/php",
+    // description of the image
+    description: "php is a widely used, open-source php management system (php).",
+    // image pull policy
+    imagePullPolicy: "IfNotPresent",
+    // image pull secrets
+    imagePullSecrets: [],
+    // ports of the image
+    ports: [
+        {
+            name: "php",
+            port: 9000,
+            protocol: "TCP"
+        }
+    ],
+    // env of the image
+    env: [
+        {
+            key: "PHP_ROOT_PASSWORD",
+            type: "secret"
+        },
+    ],
+    // volumes of the image
+    volumes: [
+        {
+            name: "php-data",
+            type: "persistentVolumeClaim",
+            mountPath: "/var/www/html"
+        }
+    ],
+    // resources of the image
+    resources: {
+        limits: {
+            cpu: 500,// 500m
+            memory: 500,// 500Mi
+        },
+        requests: {
+            cpu: 100,// 100m
+            memory: 20,// 20Mi
+        }
+    }
+};
+```
+
+You might want to use the `v1.k8s.images` service to manage container images. The service provides actions for building, deploying, and managing images. It also listens for events related to image creation, update, and removal.
+
+### Storage
+
+Create a shared storage volume for a deployment.
+
+```js
+const sharedVolume = await ctx.call("v1.k8s.volumes.create", {
+      namespace: namespace.id,
+      name: `${name}-nginx-php-data`,
+      type: "persistentVolumeClaim",
+      mountPath: "/var/www/html"
+}, options);
+```
+### Deployment
+
+Create a deployment for a container image.
+
+```js
+const phpImage = await ctx.call("v1.k8s.images.get", {
+      id: "0dk8kKmgG4TeGMbVdVV2"
+});
+// or 
+const phpImage = await ctx.call("v1.k8s.images.resolveName", {
+      name: "php-8-1-0-fpm"
+});
+const phpSchema = {
+      name: `${name}-php`,
+      namespace: namespace.id,
+      image: phpImage.id,
+      volumes: [
+         {
+            name: "php-data",
+            type: "persistentVolumeClaim",
+            mountPath: "/var/www/html",
+            persistentVolumeClaim: {
+                  claimName: sharedVolume.name
+            }
+         }
+      ],
+};
+const deployment = await ctx.call("v1.k8s.deployments.create", phpSchema, options);
+```
+
 ## Namespace
 
 Namespaces are a way to divide cluster resources between multiple users (via resource quota). Namespaces are intended for use in environments with many users spread across multiple teams, or projects. For clusters with a few to tens of users, you should not need to create or think about namespaces at all. Start using namespaces when you need the features they provide.
