@@ -228,6 +228,9 @@ module.exports = {
 
             // resolve service ports
             const servicePorts = service.ports.filter(port => port.protocol === 'HTTP');
+
+            if(servicePorts.length === 0) return;
+
             // resolve clusterIP
             const hostname = await ctx.call('v1.k8s.services.spec', {
                 id: service.id

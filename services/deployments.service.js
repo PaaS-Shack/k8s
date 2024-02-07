@@ -607,6 +607,8 @@ module.exports = {
 				await this.createDeployment(ctx, namespace, deployment, image);
 
 				await this.createTailsLogs(ctx, namespace, deployment, image);
+
+				this.logger.info(`Deployment ${deployment.name} created`);
 			}
 		},
 		"k8s.deployments.updated": {
@@ -619,6 +621,8 @@ module.exports = {
 
 				// updated the deployment schema
 				await this.applyDeployment(ctx, namespace, deployment, image);
+
+				this.logger.info(`Deployment ${deployment.name} updated`);
 			}
 		},
 		"k8s.deployments.removed": {
@@ -634,6 +638,8 @@ module.exports = {
 
 				// remove tails logs
 				await ctx.call("v1.tails.remove", { id: deployment.tails });
+
+				this.logger.info(`Deployment ${deployment.name} removed`);
 			}
 		},
 	},
