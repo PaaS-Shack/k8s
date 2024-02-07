@@ -507,6 +507,15 @@ module.exports = {
 				namespace: namespace.name,
 				cluster: namespace.cluster,
 				body: configMap
+			}).catch((err) => {
+				this.logger.info(`configMap ${volume.name} create failed`);
+				// replace configMap
+				return ctx.call('v1.kube.replaceNamespacedConfigMap', {
+					namespace: namespace.name,
+					cluster: namespace.cluster,
+					name: volume.name,
+					body: configMap
+				});
 			});
 
 			const ConfigMapVolumeSource = {
