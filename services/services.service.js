@@ -223,12 +223,18 @@ module.exports = {
 			// resolve image
 			const image = await ctx.call('v1.k8s.images.resolve', { id: deployment.image }, options);
 
+			const ports = [...image.ports, ...deployment.ports];
+
+			if(ports.length == 0) {
+				this.logger.info(`no ports defined for deployment ${deployment.name}`)
+				return;
+			}
 			// create entity
 			const service = await ctx.call('v1.k8s.services.create', {
 				name: `${deployment.name}-service`,
 				namespace: namespace.id,
 				deployment: deployment.id,
-				ports: [...image.ports, ...deployment.ports],
+				ports: ports,
 				selector: [...image.labels, ...deployment.labels],
 			}, options);
 			this.logger.info(`created service ${service.name} in namespace ${namespace.name} for deployment ${deployment.name}`)
