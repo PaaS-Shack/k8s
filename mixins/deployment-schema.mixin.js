@@ -636,12 +636,18 @@ module.exports = {
 
                 spec.limits.cpu = `${deployment.resources.limits.cpu}m`;
                 spec.limits.memory = `${deployment.resources.limits.memory}Mi`;
-            } else {
+            } else if (image.resources) {
                 spec.requests.cpu = `${image.resources.requests.cpu}m`;
                 spec.requests.memory = `${image.resources.requests.memory}Mi`;
 
                 spec.limits.cpu = `${image.resources.limits.cpu}m`;
                 spec.limits.memory = `${image.resources.limits.memory}Mi`;
+            }else{
+                spec.requests.cpu = `100m`;
+                spec.requests.memory = `128Mi`;
+
+                spec.limits.cpu = `200m`;
+                spec.limits.memory = `256Mi`;
             }
 
             // return the spec
