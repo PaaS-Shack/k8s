@@ -13,6 +13,7 @@ export const filebrowser = {
     repository: "filebrowser/filebrowser",
     description: "Filebrowser is a file manager for the web running on your server",
     imagePullPolicy: "IfNotPresent",
+    imagePullSecrets: [],
     ports: [
         {
             name: "http",
