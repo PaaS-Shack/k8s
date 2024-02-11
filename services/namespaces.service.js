@@ -3,6 +3,7 @@
 const DbService = require("db-mixin");
 const Cron = require("cron-mixin");
 const Membership = require("membership-mixin");
+const ConfigLoader = require("config-mixin");
 
 const { MoleculerClientError } = require("moleculer").Errors;
 
@@ -21,7 +22,8 @@ module.exports = {
 		}),
 		Membership({
 			permissions: 'k8s.namespaces'
-		})
+		}),
+        ConfigLoader(['k8s.**']),
 	],
 
 	/**
@@ -50,7 +52,13 @@ module.exports = {
 			...Membership.SCOPE,
 		},
 
-		defaultScopes: [...DbService.DSCOPE, ...Membership.DSCOPE]
+		defaultScopes: [...DbService.DSCOPE, ...Membership.DSCOPE],
+
+		config: {
+			"k8s.cluster": "one-host",
+			"k8s.resourceQuota": "resourcequota ID",
+			"k8s.domain": "domain ID",
+		}
 	},
 
 	/**
@@ -220,6 +228,44 @@ module.exports = {
 	 * Events
 	 */
 	events: {
+		/**
+		 * account created event
+		 */
+		"accounts.created"(ctx) {
+			const account = ctx.params.data;
+			this.logger.info(`Account ${account.username} created`);
+
+			const options = {
+				meta: {
+					userID: account.id,
+				}
+			};
+
+			// create namespace
+			return ctx.call("v1.k8s.namespaces.create", {
+				name: account.username,
+				cluster: this.config['k8s.cluster'],
+				labels: [],
+				annotations: [],
+				resourceQuota: this.config['k8s.resourceQuota'],
+				domain: this.config['k8s.domain'],
+			}, options);
+		},
+		/**
+		 * account removed event
+		 */
+		"accounts.removed"(ctx) {
+			const account = ctx.params.data;
+			this.logger.info(`Account ${account.username} removed`);
+
+			// find namespace by name
+			return this.findByName(account.username)
+				.then((namespace) => {
+					// if namespace found, delete
+					if (namespace)
+						return ctx.call("v1.k8s.namespaces.remove", { id: namespace.id });
+				});
+		},
 		async "k8s.namespaces.created"(ctx) {
 			const namespace = ctx.params.data;
 			await this.createNamespace(ctx, namespace)
