@@ -56,6 +56,8 @@ module.exports = {
         config: {
             "k8s.metrics.enabled": true,
             "k8s.metrics.endpoint": "https://prom.one-host.ca",
+            "k8s.metrics.lookback": 60 * 60 * 1000, // 1 hour
+            "k8s.metrics.step": 60, // points every 1 minutes
         }
     },
 
@@ -157,9 +159,9 @@ module.exports = {
 
                 for (let i = 0; i < pods.length; i++) {
                     const pod = pods[i];
-                    const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                    const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                     const end = new Date();
-                    const step = 15 * 60; // 1 point every 15 minutes
+                    const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                     // query avrage memory usage
                     const query = `avg(container_memory_working_set_bytes{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}) by (pod,namespace)`;
                     const result = await this.prom.rangeQuery(query, start, end, step)
@@ -207,9 +209,9 @@ module.exports = {
 
                 for (let i = 0; i < pods.length; i++) {
                     const pod = pods[i];
-                    const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                    const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                     const end = new Date();
-                    const step = 15 * 60; // 1 point every 15 minutes
+                    const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                     // query avrage memory usage
                     const query = `avg(rate(container_cpu_usage_seconds_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`;
                     const result = await this.prom.rangeQuery(query, start, end, step)
@@ -260,9 +262,9 @@ module.exports = {
 
                 for (let i = 0; i < pods.length; i++) {
                     const pod = pods[i];
-                    const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                    const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                     const end = new Date();
-                    const step = 15 * 60; // 1 point every 15 minutes
+                    const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                     // query avrage memory usage
                     const txQuery = `avg(rate(container_network_transmit_bytes_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`;
                     const rxQuery = `avg(rate(container_network_receive_bytes_total{pod="${pod.metadata.name}",namespace="${pod.metadata.namespace}"}[1m])) by (pod,namespace)`;
@@ -312,9 +314,9 @@ module.exports = {
                     id: params.namespace
                 });
 
-                const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                 const end = new Date();
-                const step = 15 * 60; // 1 point every 15 minutes
+                const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                 // query avrage memory usage
                 const query = `avg(container_memory_working_set_bytes{namespace="${namespace.name}"}) by (namespace)`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
@@ -357,9 +359,9 @@ module.exports = {
                     id: params.namespace
                 });
 
-                const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                 const end = new Date();
-                const step = 15 * 60; // 1 point every 15 minutes
+                const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                 // query avrage memory usage
                 const query = `avg(rate(container_cpu_usage_seconds_total{namespace="${namespace.name}"}[1m])) by (namespace)`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
@@ -400,9 +402,9 @@ module.exports = {
                     id: params.namespace
                 });
 
-                const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                 const end = new Date();
-                const step = 15 * 60; // 1 point every 15 minutes
+                const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                 // query network usage tx rx
                 const txQuery = `avg(rate(container_network_transmit_bytes_total{namespace="${namespace.name}"}[1m])) by (namespace)`;
                 const rxQuery = `avg(rate(container_network_receive_bytes_total{namespace="${namespace.name}"}[1m])) by (namespace)`;
@@ -440,9 +442,9 @@ module.exports = {
                 path: "/cluster/memory",
             },
             async handler(ctx) {
-                const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                 const end = new Date();
-                const step = 15 * 60; // 1 point every 15 minutes
+                const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                 // query avrage memory usage
                 const query = `sum(container_memory_working_set_bytes)`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
@@ -475,9 +477,9 @@ module.exports = {
                 path: "/cluster/cpu",
             },
             async handler(ctx) {
-                const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                 const end = new Date();
-                const step = 15 * 60; // 1 point every 15 minutes
+                const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                 // query avrage memory usage
                 const query = `sum(rate(container_cpu_usage_seconds_total[1m]))`;
                 const result = await this.prom.rangeQuery(query, start, end, step)
@@ -507,9 +509,9 @@ module.exports = {
                 path: "/cluster/network",
             },
             async handler(ctx) {
-                const start = new Date().getTime() - 24 * 60 * 60 * 1000;
+                const start = new Date().getTime() - this.config["k8s.metrics.lookback"];
                 const end = new Date();
-                const step = 15 * 60; // 1 point every 15 minutes
+                const step = this.config["k8s.metrics.step"]; // 1 point every 15 minutes
                 // query network usage tx rx
                 const txQuery = `sum(rate(container_network_transmit_bytes_total[1m]))`;
                 const rxQuery = `sum(rate(container_network_receive_bytes_total[1m]))`;
