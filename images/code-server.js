@@ -33,7 +33,7 @@ module.exports = {
     env: [
         {
             key: "PASSWORD",
-            type: "password"
+            type: "secret",
         }
     ],
     volumes: [
