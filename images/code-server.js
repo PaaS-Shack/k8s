@@ -22,6 +22,12 @@ module.exports = {
             name: "http",
             port: 8080,
             protocol: "HTTP"
+        },
+        {
+            name: "dev",
+            port: 8081,
+            protocol: "HTTP",
+            subdomain: "dev"
         }
     ],
     env: [
